@@ -1,5 +1,5 @@
 """
-Data package for loading and processing HCM city data.
+Gói dữ liệu để tải và xử lý dữ liệu thành phố HCM.
 """
 
 from .hcm_data import (

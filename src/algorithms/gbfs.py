@@ -1,11 +1,11 @@
 """
-Greedy Best-First Search (GBFS) Algorithm for evacuation pathfinding.
+Thuật toán Tìm kiếm Tốt nhất Ưu tiên Tham lam (GBFS) cho tìm đường sơ tán.
 
-Uses a multi-objective heuristic combining:
-- Distance to shelter
-- Flood/hazard risk
-- Road congestion
-- Shelter capacity remaining
+Sử dụng heuristic đa mục tiêu kết hợp:
+- Khoảng cách đến nơi trú ẩn
+- Rủi ro lũ lụt/thiên tai
+- Tắc nghẽn giao thông
+- Sức chứa còn lại của nơi trú ẩn
 """
 
 from typing import List, Dict, Optional, Tuple, Set, Any
@@ -23,42 +23,42 @@ from ..models.node import Node, PopulationZone, Shelter, haversine_distance
 
 @dataclass
 class SearchNode:
-    """Node in the GBFS search tree."""
+    """Nút trong cây tìm kiếm GBFS."""
     node_id: str
-    g_cost: float  # Actual cost from start
-    h_cost: float  # Heuristic cost to goal
+    g_cost: float  # Chi phí thực tế từ điểm bắt đầu
+    h_cost: float  # Chi phí heuristic đến đích
     parent: Optional['SearchNode'] = None
 
     @property
     def f_cost(self) -> float:
-        """Total estimated cost (for GBFS, we primarily use h_cost)."""
+        """Tổng chi phí ước tính (với GBFS, chủ yếu sử dụng h_cost)."""
         return self.h_cost
 
     def __lt__(self, other: 'SearchNode') -> bool:
-        """Comparison for priority queue (lower f_cost is better)."""
+        """So sánh cho hàng đợi ưu tiên (f_cost thấp hơn là tốt hơn)."""
         return self.f_cost < other.f_cost
 
 
 class GreedyBestFirstSearch(BaseAlgorithm):
     """
-    Greedy Best-First Search for evacuation pathfinding.
+    Tìm kiếm Tốt nhất Ưu tiên Tham lam cho tìm đường sơ tán.
 
-    Finds paths from population zones to shelters using a multi-objective
-    heuristic that considers distance, risk, congestion, and capacity.
+    Tìm đường đi từ các khu vực dân cư đến các nơi trú ẩn sử dụng heuristic
+    đa mục tiêu xem xét khoảng cách, rủi ro, tắc nghẽn và sức chứa.
     """
 
     def __init__(self, network: EvacuationNetwork, config: Optional[AlgorithmConfig] = None):
         """
-        Initialize GBFS algorithm.
+        Khởi tạo thuật toán GBFS.
 
         Args:
-            network: The evacuation network
-            config: Algorithm configuration (optional)
+            network: Mạng lưới sơ tán
+            config: Cấu hình thuật toán (tùy chọn)
         """
         super().__init__(network)
         self.config = config or AlgorithmConfig()
 
-        # Weights for heuristic components
+        # Trọng số cho các thành phần heuristic
         self.w_dist = self.config.distance_weight
         self.w_risk = self.config.risk_weight
         self.w_congestion = self.config.congestion_weight
@@ -70,40 +70,40 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
     def heuristic(self, node: Node, goal: Shelter, current_flow: Dict[str, int]) -> float:
         """
-        Calculate multi-objective heuristic value.
+        Tính giá trị heuristic đa mục tiêu.
 
-        Lower values are better.
+        Giá trị thấp hơn là tốt hơn.
 
         Args:
-            node: Current node
-            goal: Target shelter
-            current_flow: Current flow on each edge
+            node: Nút hiện tại
+            goal: Nơi trú ẩn đích
+            current_flow: Luồng hiện tại trên mỗi cạnh
 
         Returns:
-            Heuristic cost estimate
+            Ước tính chi phí heuristic
         """
-        # Distance component (normalized by typical max distance ~30km)
+        # Thành phần khoảng cách (chuẩn hóa theo khoảng cách tối đa điển hình ~30km)
         h_dist = haversine_distance(node.lat, node.lon, goal.lat, goal.lon) / 30.0
 
-        # Risk component (from hazard zones)
+        # Thành phần rủi ro (từ các vùng nguy hiểm)
         h_risk = self.network.get_total_risk_at(node.lat, node.lon)
 
-        # Congestion component (average edge congestion near this node)
+        # Thành phần tắc nghẽn (mức độ tắc nghẽn trung bình của các cạnh gần nút này)
         h_congestion = self._get_local_congestion(node.id)
 
-        # Capacity component (prefer shelters with more remaining capacity)
-        # Invert so lower is better
+        # Thành phần sức chứa (ưu tiên các nơi trú ẩn có nhiều sức chứa còn lại hơn)
+        # Đảo ngược để giá trị thấp hơn là tốt hơn
         capacity_ratio = goal.occupancy_rate if goal.capacity > 0 else 1.0
         h_capacity = capacity_ratio
 
-        # Combine with weights
+        # Kết hợp với trọng số
         return (self.w_dist * h_dist +
                 self.w_risk * h_risk +
                 self.w_congestion * h_congestion +
                 self.w_capacity * h_capacity)
 
     def _get_local_congestion(self, node_id: str) -> float:
-        """Get average congestion of edges connected to a node."""
+        """Lấy mức độ tắc nghẽn trung bình của các cạnh kết nối với một nút."""
         edges = self.network.get_outgoing_edges(node_id)
         if not edges:
             return 0.0
@@ -112,39 +112,39 @@ class GreedyBestFirstSearch(BaseAlgorithm):
     def find_path(self, source: PopulationZone,
                   shelters: List[Shelter]) -> Tuple[Optional[List[str]], Optional[Shelter], float]:
         """
-        Find the best path from a population zone to any available shelter.
+        Tìm đường đi tốt nhất từ một khu vực dân cư đến bất kỳ nơi trú ẩn khả dụng nào.
 
         Args:
-            source: Starting population zone
-            shelters: List of potential destination shelters
+            source: Khu vực dân cư xuất phát
+            shelters: Danh sách các nơi trú ẩn đích tiềm năng
 
         Returns:
-            Tuple of (path as list of node IDs, chosen shelter, total cost)
-            Returns (None, None, inf) if no path found
+            Tuple của (đường đi dưới dạng danh sách ID nút, nơi trú ẩn được chọn, tổng chi phí)
+            Trả về (None, None, inf) nếu không tìm thấy đường đi
         """
         if not shelters:
             return None, None, float('inf')
 
-        # Filter to shelters with capacity
+        # Lọc các nơi trú ẩn có sức chứa
         available_shelters = [s for s in shelters if s.has_capacity()]
         if not available_shelters:
             return None, None, float('inf')
 
-        # Create goal set
+        # Tạo tập hợp đích
         goal_ids = {s.id for s in available_shelters}
         shelter_map = {s.id: s for s in available_shelters}
 
-        # Priority queue: (f_cost, counter, SearchNode)
-        # Counter for tie-breaking to avoid comparing SearchNodes
+        # Hàng đợi ưu tiên: (f_cost, counter, SearchNode)
+        # Counter để phá vỡ sự ràng buộc tránh so sánh SearchNodes
         counter = 0
         open_set: List[Tuple[float, int, SearchNode]] = []
 
-        # Find nearest intersection to source
+        # Tìm giao lộ gần nhất với nguồn
         source_node = self.network.find_nearest_node(source.lat, source.lon)
         if not source_node:
             return None, None, float('inf')
 
-        # Initialize with source node
+        # Khởi tạo với nút nguồn
         start = SearchNode(
             node_id=source_node.id,
             g_cost=0.0,
@@ -153,7 +153,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         heapq.heappush(open_set, (start.f_cost, counter, start))
         counter += 1
 
-        # Visited set
+        # Tập hợp đã thăm
         visited: Set[str] = set()
         current_flow: Dict[str, int] = {}
 
@@ -163,24 +163,24 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
             _, _, current = heapq.heappop(open_set)
 
-            # Skip if already visited
+            # Bỏ qua nếu đã thăm
             if current.node_id in visited:
                 continue
             visited.add(current.node_id)
 
-            # Check if we reached a goal (shelter)
+            # Kiểm tra nếu đã đến đích (nơi trú ẩn)
             if current.node_id in goal_ids:
-                # Reconstruct path
+                # Tái tạo đường đi
                 path = self._reconstruct_path(current)
                 shelter = shelter_map[current.node_id]
                 return path, shelter, current.g_cost
 
-            # Expand neighbors
+            # Mở rộng các láng giềng
             for neighbor_id in self.network.get_neighbors(current.node_id):
                 if neighbor_id in visited:
                     continue
 
-                # Get edge cost
+                # Lấy chi phí cạnh
                 edge = self.network.get_edge_between(current.node_id, neighbor_id)
                 if not edge or edge.is_blocked:
                     continue
@@ -188,12 +188,12 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 edge_cost = edge.get_cost(self.w_risk)
                 new_g_cost = current.g_cost + edge_cost
 
-                # Get neighbor node for heuristic
+                # Lấy nút láng giềng cho heuristic
                 neighbor_node = self.network.get_node(neighbor_id)
                 if not neighbor_node:
                     continue
 
-                # Calculate heuristic to nearest shelter
+                # Tính heuristic đến nơi trú ẩn gần nhất
                 h_cost = min(
                     self.heuristic(neighbor_node, s, current_flow)
                     for s in available_shelters
@@ -212,7 +212,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         return None, None, float('inf')
 
     def _reconstruct_path(self, node: SearchNode) -> List[str]:
-        """Reconstruct path from SearchNode chain."""
+        """Tái tạo đường đi từ chuỗi SearchNode."""
         path = []
         current: Optional[SearchNode] = node
         while current:
@@ -222,10 +222,10 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
     def optimize(self, **kwargs) -> Tuple[EvacuationPlan, AlgorithmMetrics]:
         """
-        Run GBFS optimization for all population zones.
+        Chạy tối ưu hóa GBFS cho tất cả các khu vực dân cư.
 
         Returns:
-            Tuple of (EvacuationPlan, AlgorithmMetrics)
+            Tuple của (EvacuationPlan, AlgorithmMetrics)
         """
         start_time = self._start_timer()
 
@@ -242,26 +242,26 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         paths_found = 0
         total_path_length = 0
 
-        # Sort zones by population (prioritize larger zones)
+        # Sắp xếp các khu vực theo dân số (ưu tiên các khu vực lớn hơn)
         zones = sorted(zones, key=lambda z: z.population, reverse=True)
 
         for i, zone in enumerate(zones):
             if self._should_stop:
                 break
 
-            # Find path for this zone
+            # Tìm đường đi cho khu vực này
             path, shelter, cost = self.find_path(zone, shelters)
 
             if path and shelter:
-                # Calculate route metrics
+                # Tính toán các chỉ số tuyến đường
                 route_distance = self._calculate_path_distance(path)
                 route_time = self._calculate_path_time(path)
                 route_risk = self._calculate_path_risk(path)
 
-                # Determine flow (all remaining population from zone)
+                # Xác định luồng (toàn bộ dân số còn lại từ khu vực)
                 flow = zone.remaining_population
 
-                # Check shelter capacity
+                # Kiểm tra sức chứa của nơi trú ẩn
                 actual_flow = min(flow, shelter.available_capacity)
 
                 if actual_flow > 0:
@@ -276,7 +276,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                     )
                     plan.add_route(route)
 
-                    # Update shelter occupancy (for capacity-aware routing)
+                    # Cập nhật mức độ sử dụng nơi trú ẩn (để định tuyến nhận biết sức chứa)
                     shelter.current_occupancy += actual_flow
                     zone.evacuated += actual_flow
 
@@ -284,11 +284,11 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                     paths_found += 1
                     total_path_length += len(path)
 
-            # Report progress
+            # Báo cáo tiến trình
             self._metrics.convergence_history.append(total_cost)
             self.report_progress(i + 1, total_cost, plan)
 
-        # Finalize metrics
+        # Hoàn thiện các chỉ số
         self._stop_timer(start_time)
         self._metrics.iterations = total_zones
         self._metrics.final_cost = total_cost
@@ -298,7 +298,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             total_path_length / paths_found if paths_found > 0 else 0
         )
 
-        # Coverage rate: evacuees covered / min(total_population, total_capacity)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
         total_population = sum(z.population for z in zones)
         total_capacity = sum(s.capacity for s in shelters)
         max_possible = min(total_population, total_capacity)
@@ -309,7 +309,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         return plan, self._metrics
 
     def _calculate_path_distance(self, path: List[str]) -> float:
-        """Calculate total distance of a path in km."""
+        """Tính tổng khoảng cách của một đường đi tính bằng km."""
         if len(path) < 2:
             return 0.0
 
@@ -321,7 +321,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         return total
 
     def _calculate_path_time(self, path: List[str]) -> float:
-        """Calculate estimated travel time in hours."""
+        """Tính thời gian di chuyển ước tính tính bằng giờ."""
         if len(path) < 2:
             return 0.0
 
@@ -333,7 +333,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         return total
 
     def _calculate_path_risk(self, path: List[str]) -> float:
-        """Calculate average risk along a path."""
+        """Tính rủi ro trung bình dọc theo một đường đi."""
         if not path:
             return 0.0
 
@@ -349,23 +349,23 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                            shelters: List[Shelter],
                            k: int = 3) -> List[Tuple[List[str], Shelter, float]]:
         """
-        Find k-best paths from source to shelters.
+        Tìm k đường đi tốt nhất từ nguồn đến các nơi trú ẩn.
 
-        Useful for flow distribution across multiple routes.
+        Hữu ích cho phân phối luồng qua nhiều tuyến đường.
 
         Args:
-            source: Starting zone
-            shelters: Available shelters
-            k: Number of paths to find
+            source: Khu vực xuất phát
+            shelters: Các nơi trú ẩn khả dụng
+            k: Số lượng đường đi cần tìm
 
         Returns:
-            List of (path, shelter, cost) tuples
+            Danh sách các tuple (đường đi, nơi trú ẩn, chi phí)
         """
         paths = []
         used_shelters: Set[str] = set()
 
         for _ in range(k):
-            # Exclude already-used shelters
+            # Loại trừ các nơi trú ẩn đã sử dụng
             available = [s for s in shelters
                         if s.id not in used_shelters and s.has_capacity()]
             if not available:

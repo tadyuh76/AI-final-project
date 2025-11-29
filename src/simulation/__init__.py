@@ -1,10 +1,10 @@
 """
-Simulation module for evacuation scenario simulation.
+Module Mô phỏng cho mô phỏng kịch bản sơ tán.
 
-Provides:
-- SimulationEngine: Time-stepped evacuation simulation
-- TrafficFlowModel: BPR-based traffic flow dynamics
-- EventManager: Dynamic event handling system
+Cung cấp:
+- SimulationEngine: Mô phỏng sơ tán theo bước thời gian
+- TrafficFlowModel: Động lực dòng chảy giao thông dựa trên BPR
+- EventManager: Hệ thống xử lý sự kiện động
 """
 
 from .engine import (

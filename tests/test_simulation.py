@@ -1,13 +1,13 @@
 """
-Unit tests for the simulation module.
-Tests SimulationEngine, TrafficFlowModel, and EventManager.
+Kiểm thử đơn vị cho module simulation.
+Kiểm thử SimulationEngine, TrafficFlowModel và EventManager.
 """
 
 import pytest
 import sys
 import os
 
-# Add parent directory to path for imports
+# Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
@@ -29,13 +29,13 @@ from src.simulation.events import (
 )
 
 
-# ==================== Test Fixtures ====================
+# ==================== Fixture Kiểm Thử ====================
 
 def create_test_network():
-    """Create a simple test network for simulation testing."""
+    """Tạo mạng lưới kiểm thử đơn giản cho kiểm thử mô phỏng."""
     network = EvacuationNetwork()
 
-    # Create grid nodes
+    # Tạo các node lưới
     nodes = [
         Node(id="n1", lat=10.0, lon=106.0),
         Node(id="n2", lat=10.0, lon=106.05),
@@ -47,7 +47,7 @@ def create_test_network():
     for n in nodes:
         network.add_node(n)
 
-    # Create zones and shelters
+    # Tạo các khu dân cư và nơi trú ẩn
     zone1 = PopulationZone(id="zone1", lat=10.0, lon=106.0, population=1000)
     zone2 = PopulationZone(id="zone2", lat=10.05, lon=106.0, population=1500)
     shelter1 = Shelter(id="shelter1", lat=10.0, lon=106.1, capacity=2000)
@@ -58,19 +58,19 @@ def create_test_network():
     network.add_node(shelter1)
     network.add_node(shelter2)
 
-    # Connect zones to grid
+    # Kết nối các khu dân cư với lưới
     network.add_edge(Edge(id="ez1", source_id="zone1", target_id="n1",
                           length_km=0.1, is_oneway=False))
     network.add_edge(Edge(id="ez2", source_id="zone2", target_id="n4",
                           length_km=0.1, is_oneway=False))
 
-    # Connect shelters to grid
+    # Kết nối các nơi trú ẩn với lưới
     network.add_edge(Edge(id="es1", source_id="n3", target_id="shelter1",
                           length_km=0.1, is_oneway=False))
     network.add_edge(Edge(id="es2", source_id="n6", target_id="shelter2",
                           length_km=0.1, is_oneway=False))
 
-    # Create grid edges
+    # Tạo các edge lưới
     grid_edges = [
         ("n1", "n2"), ("n2", "n3"),
         ("n4", "n5"), ("n5", "n6"),
@@ -92,7 +92,7 @@ def create_test_network():
 
 
 def create_test_plan(network):
-    """Create a simple evacuation plan for testing."""
+    """Tạo kế hoạch sơ tán đơn giản để kiểm thử."""
     plan = EvacuationPlan()
 
     route1 = EvacuationRoute(
@@ -121,20 +121,20 @@ def create_test_plan(network):
     return plan
 
 
-# ==================== SimulationConfig Tests ====================
+# ==================== Kiểm Thử SimulationConfig ====================
 
 class TestSimulationConfig:
-    """Tests for SimulationConfig."""
+    """Kiểm thử cho SimulationConfig."""
 
     def test_default_config(self):
-        """Test default configuration values."""
+        """Kiểm tra các giá trị cấu hình mặc định."""
         config = SimulationConfig()
         assert config.time_step_minutes == 5.0
         assert config.max_duration_hours == 24.0
         assert config.flow_rate_per_step == 0.1
 
     def test_custom_config(self):
-        """Test custom configuration."""
+        """Kiểm tra cấu hình tùy chỉnh."""
         config = SimulationConfig(
             time_step_minutes=10.0,
             max_duration_hours=12.0
@@ -143,19 +143,19 @@ class TestSimulationConfig:
         assert config.max_duration_hours == 12.0
 
 
-# ==================== SimulationMetrics Tests ====================
+# ==================== Kiểm Thử SimulationMetrics ====================
 
 class TestSimulationMetrics:
-    """Tests for SimulationMetrics."""
+    """Kiểm thử cho SimulationMetrics."""
 
     def test_default_metrics(self):
-        """Test default metrics values."""
+        """Kiểm tra các giá trị chỉ số mặc định."""
         metrics = SimulationMetrics()
         assert metrics.total_evacuated == 0
         assert metrics.evacuation_progress == 0.0
 
     def test_to_dict(self):
-        """Test metrics serialization."""
+        """Kiểm tra tuần tự hóa chỉ số."""
         metrics = SimulationMetrics(
             total_evacuated=500,
             evacuation_progress=0.5
@@ -165,13 +165,13 @@ class TestSimulationMetrics:
         assert data['evacuation_progress'] == 0.5
 
 
-# ==================== RouteState Tests ====================
+# ==================== Kiểm Thử RouteState ====================
 
 class TestRouteState:
-    """Tests for RouteState."""
+    """Kiểm thử cho RouteState."""
 
     def test_remaining_calculation(self):
-        """Test remaining population calculation."""
+        """Kiểm tra tính toán dân số còn lại."""
         route = EvacuationRoute(
             zone_id="z1", shelter_id="s1",
             path=[], flow=1000
@@ -184,7 +184,7 @@ class TestRouteState:
         assert state.remaining == 700
 
     def test_is_complete(self):
-        """Test completion check."""
+        """Kiểm tra kiểm tra hoàn thành."""
         route = EvacuationRoute(
             zone_id="z1", shelter_id="s1",
             path=[], flow=100
@@ -198,7 +198,7 @@ class TestRouteState:
         assert state.is_complete is True
 
     def test_not_complete_with_in_transit(self):
-        """Test not complete when people still in transit."""
+        """Kiểm tra chưa hoàn thành khi còn người đang di chuyển."""
         route = EvacuationRoute(
             zone_id="z1", shelter_id="s1",
             path=[], flow=100
@@ -212,19 +212,19 @@ class TestRouteState:
         assert state.is_complete is False
 
 
-# ==================== SimulationEngine Tests ====================
+# ==================== Kiểm Thử SimulationEngine ====================
 
 class TestSimulationEngine:
-    """Tests for SimulationEngine."""
+    """Kiểm thử cho SimulationEngine."""
 
     def test_engine_creation(self):
-        """Test engine creation."""
+        """Kiểm tra tạo engine."""
         network = create_test_network()
         engine = SimulationEngine(network)
         assert engine.state == SimulationState.IDLE
 
     def test_initialize(self):
-        """Test simulation initialization."""
+        """Kiểm tra khởi tạo mô phỏng."""
         network = create_test_network()
         plan = create_test_plan(network)
         engine = SimulationEngine(network)
@@ -236,7 +236,7 @@ class TestSimulationEngine:
         assert len(engine.get_route_states()) == 2
 
     def test_step(self):
-        """Test single simulation step."""
+        """Kiểm tra bước mô phỏng đơn."""
         network = create_test_network()
         plan = create_test_plan(network)
         engine = SimulationEngine(network)
@@ -249,7 +249,7 @@ class TestSimulationEngine:
         assert engine.current_time > 0
 
     def test_run_simulation(self):
-        """Test running complete simulation."""
+        """Kiểm tra chạy mô phỏng hoàn chỉnh."""
         network = create_test_network()
         plan = create_test_plan(network)
         config = SimulationConfig(
@@ -261,15 +261,15 @@ class TestSimulationEngine:
         metrics = engine.run(plan)
 
         assert metrics.total_evacuated > 0
-        # Simulation may complete, hit max duration, or still be running
+        # Mô phỏng có thể hoàn thành, đạt thời lượng tối đa, hoặc vẫn chạy
         assert engine.state in [
             SimulationState.COMPLETED,
             SimulationState.IDLE,
-            SimulationState.RUNNING  # Hit max steps
+            SimulationState.RUNNING  # Đạt số bước tối đa
         ]
 
     def test_pause_resume(self):
-        """Test pause and resume."""
+        """Kiểm tra tạm dừng và tiếp tục."""
         network = create_test_network()
         engine = SimulationEngine(network)
 
@@ -280,7 +280,7 @@ class TestSimulationEngine:
         assert engine.state == SimulationState.RUNNING
 
     def test_stop(self):
-        """Test stopping simulation."""
+        """Kiểm tra dừng mô phỏng."""
         network = create_test_network()
         engine = SimulationEngine(network)
 
@@ -288,7 +288,7 @@ class TestSimulationEngine:
         assert engine.state == SimulationState.IDLE
 
     def test_reset(self):
-        """Test resetting simulation."""
+        """Kiểm tra đặt lại mô phỏng."""
         network = create_test_network()
         plan = create_test_plan(network)
         engine = SimulationEngine(network)
@@ -301,7 +301,7 @@ class TestSimulationEngine:
         assert len(engine.get_route_states()) == 0
 
     def test_update_callback(self):
-        """Test update callback is called."""
+        """Kiểm tra callback cập nhật được gọi."""
         network = create_test_network()
         plan = create_test_plan(network)
         engine = SimulationEngine(network)
@@ -319,7 +319,7 @@ class TestSimulationEngine:
         assert callback_count[0] > 0
 
     def test_get_evacuation_snapshot(self):
-        """Test getting evacuation snapshot."""
+        """Kiểm tra lấy snapshot sơ tán."""
         network = create_test_network()
         plan = create_test_plan(network)
         engine = SimulationEngine(network)
@@ -333,36 +333,36 @@ class TestSimulationEngine:
         assert len(snapshot['routes']) == 2
 
 
-# ==================== TrafficConfig Tests ====================
+# ==================== Kiểm Thử TrafficConfig ====================
 
 class TestTrafficConfig:
-    """Tests for TrafficConfig."""
+    """Kiểm thử cho TrafficConfig."""
 
     def test_default_config(self):
-        """Test default traffic configuration."""
+        """Kiểm tra cấu hình giao thông mặc định."""
         config = TrafficConfig()
         assert config.bpr_alpha == 0.15
         assert config.bpr_beta == 4.0
         assert config.persons_per_vehicle == 3.0
 
 
-# ==================== TrafficFlowModel Tests ====================
+# ==================== Kiểm Thử TrafficFlowModel ====================
 
 class TestTrafficFlowModel:
-    """Tests for TrafficFlowModel."""
+    """Kiểm thử cho TrafficFlowModel."""
 
     def test_model_creation(self):
-        """Test traffic model creation."""
+        """Kiểm tra tạo mô hình giao thông."""
         network = create_test_network()
         model = TrafficFlowModel(network)
         assert model is not None
 
     def test_update(self):
-        """Test traffic update."""
+        """Kiểm tra cập nhật giao thông."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
-        # Add some flow to edges
+        # Thêm một số lưu lượng vào edge
         for edge in network.get_edges():
             edge.add_flow(100)
 
@@ -372,20 +372,20 @@ class TestTrafficFlowModel:
         assert len(state.edges) > 0
 
     def test_bpr_travel_time(self):
-        """Test BPR travel time calculation."""
+        """Kiểm tra tính toán thời gian di chuyển BPR."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
-        # Free flow
+        # Lưu thông tự do
         time_free = model._bpr_travel_time(1.0, 0.0)
         assert time_free == 1.0
 
-        # Congested
+        # Tắc nghẽn
         time_congested = model._bpr_travel_time(1.0, 1.0)
         assert time_congested > 1.0
 
     def test_traffic_states(self):
-        """Test traffic state determination."""
+        """Kiểm tra xác định trạng thái giao thông."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
@@ -395,7 +395,7 @@ class TestTrafficFlowModel:
         assert model._determine_traffic_state(1.2) == TrafficState.GRIDLOCK
 
     def test_get_route_travel_time(self):
-        """Test route travel time calculation."""
+        """Kiểm tra tính toán thời gian di chuyển tuyến đường."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
@@ -406,7 +406,7 @@ class TestTrafficFlowModel:
         assert time < float('inf')
 
     def test_congestion_map(self):
-        """Test getting congestion map."""
+        """Kiểm tra lấy bản đồ tắc nghẽn."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
@@ -414,7 +414,7 @@ class TestTrafficFlowModel:
         assert len(congestion) > 0
 
     def test_apply_incident(self):
-        """Test applying and clearing incidents."""
+        """Kiểm tra áp dụng và xóa sự cố."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
@@ -428,11 +428,11 @@ class TestTrafficFlowModel:
         assert state.capacity_factor == 1.0
 
     def test_reset(self):
-        """Test resetting traffic model."""
+        """Kiểm tra đặt lại mô hình giao thông."""
         network = create_test_network()
         model = TrafficFlowModel(network)
 
-        # Modify state
+        # Sửa đổi trạng thái
         edge_id = list(network._edges.keys())[0]
         model.apply_incident(edge_id, 0.5)
 
@@ -442,23 +442,23 @@ class TestTrafficFlowModel:
         assert state.capacity_factor == 1.0
 
 
-# ==================== TrafficAssignment Tests ====================
+# ==================== Kiểm Thử TrafficAssignment ====================
 
 class TestTrafficAssignment:
-    """Tests for TrafficAssignment."""
+    """Kiểm thử cho TrafficAssignment."""
 
     def test_assignment_creation(self):
-        """Test traffic assignment creation."""
+        """Kiểm tra tạo phân bổ giao thông."""
         network = create_test_network()
         assignment = TrafficAssignment(network)
         assert assignment is not None
 
     def test_assign_flow(self):
-        """Test flow assignment."""
+        """Kiểm tra phân bổ lưu lượng."""
         network = create_test_network()
         assignment = TrafficAssignment(network)
 
-        # Simple OD matrix
+        # Ma trận OD đơn giản
         od_matrix = {
             ("zone1", "shelter1"): 100.0
         }
@@ -467,13 +467,13 @@ class TestTrafficAssignment:
         assert len(flows) > 0
 
 
-# ==================== EventQueue Tests ====================
+# ==================== Kiểm Thử EventQueue ====================
 
 class TestEventQueue:
-    """Tests for EventQueue."""
+    """Kiểm thử cho EventQueue."""
 
     def test_push_pop(self):
-        """Test push and pop operations."""
+        """Kiểm tra các thao tác push và pop."""
         queue = EventQueue()
 
         event1 = SimulationEvent(
@@ -488,12 +488,12 @@ class TestEventQueue:
         queue.push(event1)
         queue.push(event2)
 
-        # Higher priority should come first
+        # Ưu tiên cao hơn nên lên trước
         popped = queue.pop()
         assert popped.id == "2"
 
     def test_peek(self):
-        """Test peek without removing."""
+        """Kiểm tra peek mà không xóa."""
         queue = EventQueue()
         event = SimulationEvent(
             id="1", event_type=EventType.ACCIDENT,
@@ -506,7 +506,7 @@ class TestEventQueue:
         assert len(queue) == 1
 
     def test_schedule(self):
-        """Test scheduled events."""
+        """Kiểm tra các sự kiện đã lên lịch."""
         queue = EventQueue()
         event = SimulationEvent(
             id="1", event_type=EventType.ACCIDENT,
@@ -514,16 +514,16 @@ class TestEventQueue:
         )
         queue.schedule(event, trigger_time=1.0)
 
-        # Not triggered yet
+        # Chưa kích hoạt
         triggered = queue.check_scheduled(0.5)
         assert len(triggered) == 0
 
-        # Now triggered
+        # Đã kích hoạt
         triggered = queue.check_scheduled(1.5)
         assert len(triggered) == 1
 
     def test_recurring_schedule(self):
-        """Test recurring scheduled events."""
+        """Kiểm tra các sự kiện lên lịch định kỳ."""
         queue = EventQueue()
         event = SimulationEvent(
             id="1", event_type=EventType.HAZARD_EXPANDED,
@@ -531,22 +531,22 @@ class TestEventQueue:
         )
         queue.schedule(event, trigger_time=1.0, recurring=True, interval=1.0)
 
-        # First trigger
+        # Kích hoạt lần đầu
         triggered = queue.check_scheduled(1.0)
         assert len(triggered) == 1
 
-        # Second trigger
+        # Kích hoạt lần hai
         triggered = queue.check_scheduled(2.0)
         assert len(triggered) == 1
 
 
-# ==================== EventManager Tests ====================
+# ==================== Kiểm Thử EventManager ====================
 
 class TestEventManager:
-    """Tests for EventManager."""
+    """Kiểm thử cho EventManager."""
 
     def test_subscribe_emit(self):
-        """Test subscribing and emitting events."""
+        """Kiểm tra đăng ký và phát sự kiện."""
         manager = EventManager()
         received = []
 
@@ -565,7 +565,7 @@ class TestEventManager:
         assert received[0].id == "1"
 
     def test_subscribe_all(self):
-        """Test subscribing to all events."""
+        """Kiểm tra đăng ký tất cả sự kiện."""
         manager = EventManager()
         received = []
 
@@ -583,7 +583,7 @@ class TestEventManager:
         assert len(received) == 2
 
     def test_queue_and_process(self):
-        """Test queuing and processing events."""
+        """Kiểm tra xếp hàng và xử lý sự kiện."""
         manager = EventManager()
         processed = []
 
@@ -598,17 +598,17 @@ class TestEventManager:
         )
         manager.queue(event)
 
-        # Process at time 0.5 (should not process)
+        # Xử lý tại thời điểm 0.5 (không nên xử lý)
         count = manager.process_queue(0.5)
         assert count == 0
 
-        # Process at time 1.5 (should process)
+        # Xử lý tại thời điểm 1.5 (nên xử lý)
         count = manager.process_queue(1.5)
         assert count == 1
         assert len(processed) == 1
 
     def test_get_history(self):
-        """Test event history."""
+        """Kiểm tra lịch sử sự kiện."""
         manager = EventManager()
 
         event1 = SimulationEvent(id="1", event_type=EventType.ACCIDENT, timestamp=1.0)
@@ -617,16 +617,16 @@ class TestEventManager:
         manager.emit(event1)
         manager.emit(event2)
 
-        # All history
+        # Toàn bộ lịch sử
         history = manager.get_history()
         assert len(history) == 2
 
-        # Filtered history
+        # Lịch sử được lọc
         history = manager.get_history(EventType.ACCIDENT)
         assert len(history) == 1
 
     def test_clear(self):
-        """Test clearing events."""
+        """Kiểm tra xóa sự kiện."""
         manager = EventManager()
 
         event = SimulationEvent(id="1", event_type=EventType.ACCIDENT, timestamp=1.0)
@@ -638,13 +638,13 @@ class TestEventManager:
         assert manager.pending_count == 0
 
 
-# ==================== EventFactory Tests ====================
+# ==================== Kiểm Thử EventFactory ====================
 
 class TestEventFactory:
-    """Tests for EventFactory."""
+    """Kiểm thử cho EventFactory."""
 
     def test_create_road_blocked(self):
-        """Test creating road blocked event."""
+        """Kiểm tra tạo sự kiện đường bị chặn."""
         event = EventFactory.create_road_blocked("edge1", 1.0, "flooding")
 
         assert event.event_type == EventType.ROAD_BLOCKED
@@ -653,7 +653,7 @@ class TestEventFactory:
         assert event.priority == EventPriority.HIGH
 
     def test_create_accident(self):
-        """Test creating accident event."""
+        """Kiểm tra tạo sự kiện tai nạn."""
         event = EventFactory.create_accident("edge1", 1.0, 0.7)
 
         assert event.event_type == EventType.ACCIDENT
@@ -661,24 +661,24 @@ class TestEventFactory:
         assert 'capacity_reduction' in event.data
 
     def test_create_flooding(self):
-        """Test creating flooding event with depth-based severity."""
-        # Shallow flooding
+        """Kiểm tra tạo sự kiện lũ lụt với mức độ nghiêm trọng dựa trên độ sâu."""
+        # Lũ nông
         event_shallow = EventFactory.create_flooding("edge1", 1.0, 25.0)
         assert event_shallow.data['severity'] == 0.5
 
-        # Deep flooding
+        # Lũ sâu
         event_deep = EventFactory.create_flooding("edge1", 1.0, 60.0)
         assert event_deep.data['severity'] == 1.0
 
     def test_create_shelter_closed(self):
-        """Test creating shelter closed event."""
+        """Kiểm tra tạo sự kiện nơi trú ẩn đóng cửa."""
         event = EventFactory.create_shelter_closed("shelter1", 1.0, "damage")
 
         assert event.event_type == EventType.SHELTER_CLOSED
         assert event.priority == EventPriority.CRITICAL
 
     def test_create_hazard(self):
-        """Test creating hazard event."""
+        """Kiểm tra tạo sự kiện vùng nguy hiểm."""
         event = EventFactory.create_hazard(10.7, 106.7, 2.0, 1.0, "flood")
 
         assert event.event_type == EventType.HAZARD_CREATED
@@ -686,19 +686,19 @@ class TestEventFactory:
         assert event.data['radius_km'] == 2.0
 
 
-# ==================== RandomEventGenerator Tests ====================
+# ==================== Kiểm Thử RandomEventGenerator ====================
 
 class TestRandomEventGenerator:
-    """Tests for RandomEventGenerator."""
+    """Kiểm thử cho RandomEventGenerator."""
 
     def test_generator_creation(self):
-        """Test generator creation with seed."""
+        """Kiểm tra tạo generator với seed."""
         network = create_test_network()
         generator = RandomEventGenerator(network, seed=42)
         assert generator is not None
 
     def test_generate_random_accident(self):
-        """Test generating random accident."""
+        """Kiểm tra tạo tai nạn ngẫu nhiên."""
         network = create_test_network()
         generator = RandomEventGenerator(network, seed=42)
 
@@ -709,7 +709,7 @@ class TestRandomEventGenerator:
         assert 0.3 <= event.data['severity'] <= 0.9
 
     def test_generate_random_flooding(self):
-        """Test generating random flooding."""
+        """Kiểm tra tạo lũ lụt ngẫu nhiên."""
         network = create_test_network()
         generator = RandomEventGenerator(network, seed=42)
 
@@ -719,7 +719,7 @@ class TestRandomEventGenerator:
         assert 20 <= event.data['depth_cm'] <= 80
 
     def test_generate_scenario_events(self):
-        """Test generating scenario events."""
+        """Kiểm tra tạo các sự kiện kịch bản."""
         network = create_test_network()
         generator = RandomEventGenerator(network, seed=42)
 
@@ -729,12 +729,12 @@ class TestRandomEventGenerator:
         )
 
         assert len(events) > 0
-        # Events should be sorted by timestamp
+        # Sự kiện nên được sắp xếp theo timestamp
         for i in range(1, len(events)):
             assert events[i].timestamp >= events[i-1].timestamp
 
     def test_reproducibility(self):
-        """Test that same seed produces same events."""
+        """Kiểm tra cùng seed tạo cùng sự kiện."""
         network = create_test_network()
 
         gen1 = RandomEventGenerator(network, seed=42)
@@ -747,13 +747,13 @@ class TestRandomEventGenerator:
         assert event1.data['severity'] == event2.data['severity']
 
 
-# ==================== Integration Tests ====================
+# ==================== Kiểm Thử Tích Hợp ====================
 
 class TestSimulationIntegration:
-    """Integration tests for simulation components."""
+    """Kiểm thử tích hợp cho các thành phần mô phỏng."""
 
     def test_engine_with_traffic_model(self):
-        """Test simulation engine with traffic model."""
+        """Kiểm tra engine mô phỏng với mô hình giao thông."""
         network = create_test_network()
         plan = create_test_plan(network)
 
@@ -763,23 +763,23 @@ class TestSimulationIntegration:
         engine.initialize(plan)
         engine._state = SimulationState.RUNNING
 
-        # Run a few steps
+        # Chạy vài bước
         for _ in range(5):
             engine.step()
             traffic.update(0.1)
 
-        # Both should have state
+        # Cả hai nên có trạng thái
         assert engine.metrics.current_time_hours > 0
 
     def test_engine_with_events(self):
-        """Test simulation engine with event handling."""
+        """Kiểm tra engine mô phỏng với xử lý sự kiện."""
         network = create_test_network()
         plan = create_test_plan(network)
 
         engine = SimulationEngine(network)
         events = EventManager()
 
-        # Track route blockages
+        # Theo dõi các tuyến đường bị chặn
         blocked_routes = []
 
         def on_route_blocked(event):
@@ -789,7 +789,7 @@ class TestSimulationIntegration:
 
         engine.initialize(plan)
 
-        # Simulate blocking a route
+        # Mô phỏng chặn một tuyến đường
         event = EventFactory.create_reroute_needed("route_0", 0.5)
         events.emit(event)
 

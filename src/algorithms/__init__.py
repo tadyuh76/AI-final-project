@@ -1,10 +1,10 @@
 """
-Algorithms package for evacuation optimization.
+Gói thuật toán cho tối ưu hóa sơ tán.
 
-Provides three optimization algorithms:
-- GBFS: Greedy Best-First Search for pathfinding
-- GWO: Grey Wolf Optimizer for flow distribution
-- Hybrid: Combined GBFS + GWO for best results
+Cung cấp ba thuật toán tối ưu hóa:
+- GBFS: Tìm kiếm tốt nhất ưu tiên đầu tiên tham lam cho tìm đường
+- GWO: Bộ tối ưu hóa bầy sói xám cho phân phối luồng
+- Hybrid: Kết hợp GBFS + GWO cho kết quả tốt nhất
 """
 
 from .base import (
@@ -18,13 +18,13 @@ from .hybrid import HybridGBFSGWO
 from .comparator import AlgorithmComparator, ComparisonResult, run_comparison
 
 __all__ = [
-    # Types and Config
+    # Các loại và cấu hình
     'AlgorithmType', 'AlgorithmConfig',
-    # Base classes
+    # Các lớp cơ sở
     'BaseAlgorithm', 'EvacuationPlan', 'EvacuationRoute', 'AlgorithmMetrics',
     'ProgressCallback',
-    # Algorithms
+    # Các thuật toán
     'GreedyBestFirstSearch', 'GreyWolfOptimizer', 'HybridGBFSGWO',
-    # Comparison
+    # So sánh
     'AlgorithmComparator', 'ComparisonResult', 'run_comparison'
 ]

@@ -1,6 +1,6 @@
 """
-Unit tests for the algorithms module.
-Tests GBFS, GWO, Hybrid algorithms and the Comparator.
+Kiểm thử đơn vị cho module algorithms.
+Kiểm thử các thuật toán GBFS, GWO, Hybrid và Comparator.
 """
 
 import pytest
@@ -8,7 +8,7 @@ import sys
 import os
 import numpy as np
 
-# Add parent directory to path for imports
+# Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
@@ -24,13 +24,13 @@ from src.algorithms.hybrid import HybridGBFSGWO
 from src.algorithms.comparator import AlgorithmComparator, ComparisonResult
 
 
-# ==================== Test Fixtures ====================
+# ==================== Fixture Kiểm Thử ====================
 
 def create_simple_network():
-    """Create a simple test network with 2 zones, 2 shelters, and connecting roads."""
+    """Tạo mạng lưới kiểm thử đơn giản với 2 khu dân cư, 2 nơi trú ẩn và đường kết nối."""
     network = EvacuationNetwork()
 
-    # Create intersections (grid layout)
+    # Tạo các giao lộ (bố trí lưới)
     #   n1 -- n2 -- n3
     #   |     |     |
     #   n4 -- n5 -- n6
@@ -45,27 +45,27 @@ def create_simple_network():
     for n in nodes:
         network.add_node(n)
 
-    # Create zones
+    # Tạo các khu dân cư
     zone1 = PopulationZone(id="zone1", lat=10.0, lon=106.0, population=1000)
     zone2 = PopulationZone(id="zone2", lat=10.05, lon=106.0, population=1500)
     network.add_node(zone1)
     network.add_node(zone2)
 
-    # Create shelters
+    # Tạo các nơi trú ẩn
     shelter1 = Shelter(id="shelter1", lat=10.0, lon=106.1, capacity=2000)
     shelter2 = Shelter(id="shelter2", lat=10.05, lon=106.1, capacity=1500)
     network.add_node(shelter1)
     network.add_node(shelter2)
 
-    # Connect zones to grid
+    # Kết nối các khu dân cư với lưới
     network.add_edge(Edge(id="ez1", source_id="zone1", target_id="n1", length_km=0.1, is_oneway=False))
     network.add_edge(Edge(id="ez2", source_id="zone2", target_id="n4", length_km=0.1, is_oneway=False))
 
-    # Connect shelters to grid
+    # Kết nối các nơi trú ẩn với lưới
     network.add_edge(Edge(id="es1", source_id="n3", target_id="shelter1", length_km=0.1, is_oneway=False))
     network.add_edge(Edge(id="es2", source_id="n6", target_id="shelter2", length_km=0.1, is_oneway=False))
 
-    # Create grid edges
+    # Tạo các edge lưới
     grid_edges = [
         ("n1", "n2"), ("n2", "n3"),
         ("n4", "n5"), ("n5", "n6"),
@@ -87,10 +87,10 @@ def create_simple_network():
 
 
 def create_network_with_hazard():
-    """Create a network with a hazard zone blocking direct paths."""
+    """Tạo mạng lưới có vùng nguy hiểm chặn đường đi trực tiếp."""
     network = create_simple_network()
 
-    # Add hazard zone between n2 and n5
+    # Thêm vùng nguy hiểm giữa n2 và n5
     hazard = HazardZone(
         center_lat=10.025,
         center_lon=106.05,
@@ -102,13 +102,13 @@ def create_network_with_hazard():
     return network
 
 
-# ==================== Base Algorithm Tests ====================
+# ==================== Kiểm Thử Thuật Toán Cơ Bản ====================
 
 class TestAlgorithmConfig:
-    """Tests for AlgorithmConfig."""
+    """Kiểm thử cho AlgorithmConfig."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+        """Kiểm tra các giá trị cấu hình mặc định."""
         config = AlgorithmConfig()
         assert config.distance_weight == 0.4
         assert config.risk_weight == 0.3
@@ -116,7 +116,7 @@ class TestAlgorithmConfig:
         assert config.max_iterations == 100
 
     def test_custom_values(self):
-        """Test custom configuration."""
+        """Kiểm tra cấu hình tùy chỉnh."""
         config = AlgorithmConfig(
             distance_weight=0.5,
             n_wolves=50,
@@ -127,14 +127,14 @@ class TestAlgorithmConfig:
         assert config.max_iterations == 200
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
+        """Kiểm tra tuần tự hóa sang từ điển."""
         config = AlgorithmConfig()
         data = config.to_dict()
         assert 'distance_weight' in data
         assert 'n_wolves' in data
 
     def test_from_dict(self):
-        """Test deserialization from dictionary."""
+        """Kiểm tra giải tuần tự hóa từ từ điển."""
         data = {'distance_weight': 0.6, 'n_wolves': 40}
         config = AlgorithmConfig.from_dict(data)
         assert config.distance_weight == 0.6
@@ -142,10 +142,10 @@ class TestAlgorithmConfig:
 
 
 class TestEvacuationRoute:
-    """Tests for EvacuationRoute."""
+    """Kiểm thử cho EvacuationRoute."""
 
     def test_route_creation(self):
-        """Test route creation."""
+        """Kiểm tra tạo tuyến đường."""
         route = EvacuationRoute(
             zone_id="zone1",
             shelter_id="shelter1",
@@ -161,16 +161,16 @@ class TestEvacuationRoute:
 
 
 class TestEvacuationPlan:
-    """Tests for EvacuationPlan."""
+    """Kiểm thử cho EvacuationPlan."""
 
     def test_empty_plan(self):
-        """Test empty plan."""
+        """Kiểm tra kế hoạch trống."""
         plan = EvacuationPlan()
         assert len(plan.routes) == 0
         assert plan.total_evacuees == 0
 
     def test_add_route(self):
-        """Test adding routes to plan."""
+        """Kiểm tra thêm tuyến đường vào kế hoạch."""
         plan = EvacuationPlan()
         route = EvacuationRoute(
             zone_id="z1", shelter_id="s1",
@@ -183,7 +183,7 @@ class TestEvacuationPlan:
         assert plan.total_evacuees == 1000
 
     def test_weighted_metrics(self):
-        """Test that metrics are correctly weighted by flow."""
+        """Kiểm tra các chỉ số được trọng số hóa đúng theo lưu lượng."""
         plan = EvacuationPlan()
 
         route1 = EvacuationRoute(
@@ -199,13 +199,13 @@ class TestEvacuationPlan:
         plan.add_route(route1)
         plan.add_route(route2)
 
-        # Average time: (1.0*1000 + 2.0*1000) / 2000 = 1.5
+        # Thời gian trung bình: (1.0*1000 + 2.0*1000) / 2000 = 1.5
         assert plan.total_time_hours == 1.5
-        # Average risk: (0.2*1000 + 0.4*1000) / 2000 = 0.3
+        # Rủi ro trung bình: (0.2*1000 + 0.4*1000) / 2000 = 0.3
         assert plan.average_risk == 0.3
 
     def test_get_shelter_loads(self):
-        """Test shelter load calculation."""
+        """Kiểm tra tính toán tải nơi trú ẩn."""
         plan = EvacuationPlan()
         plan.add_route(EvacuationRoute(
             zone_id="z1", shelter_id="s1",
@@ -226,16 +226,16 @@ class TestEvacuationPlan:
 
 
 class TestAlgorithmMetrics:
-    """Tests for AlgorithmMetrics."""
+    """Kiểm thử cho AlgorithmMetrics."""
 
     def test_metrics_creation(self):
-        """Test metrics creation."""
+        """Kiểm tra tạo chỉ số."""
         metrics = AlgorithmMetrics(algorithm_type=AlgorithmType.GBFS)
         assert metrics.algorithm_type == AlgorithmType.GBFS
         assert metrics.execution_time_seconds == 0.0
 
     def test_metrics_to_dict(self):
-        """Test metrics serialization."""
+        """Kiểm tra tuần tự hóa chỉ số."""
         metrics = AlgorithmMetrics(
             algorithm_type=AlgorithmType.GBFS,
             execution_time_seconds=1.5,
@@ -246,45 +246,45 @@ class TestAlgorithmMetrics:
         assert data['execution_time'] == 1.5
 
 
-# ==================== GBFS Tests ====================
+# ==================== Kiểm Thử GBFS ====================
 
 class TestSearchNode:
-    """Tests for GBFS SearchNode."""
+    """Kiểm thử cho GBFS SearchNode."""
 
     def test_search_node_creation(self):
-        """Test search node creation."""
+        """Kiểm tra tạo node tìm kiếm."""
         node = SearchNode(node_id="n1", g_cost=1.0, h_cost=2.0)
         assert node.node_id == "n1"
-        assert node.f_cost == 2.0  # GBFS uses h_cost for priority
+        assert node.f_cost == 2.0  # GBFS dùng h_cost cho độ ưu tiên
 
     def test_search_node_comparison(self):
-        """Test search node comparison for priority queue."""
+        """Kiểm tra so sánh node tìm kiếm cho hàng đợi ưu tiên."""
         node1 = SearchNode(node_id="n1", g_cost=1.0, h_cost=2.0)
         node2 = SearchNode(node_id="n2", g_cost=1.0, h_cost=3.0)
-        assert node1 < node2  # Lower h_cost should be "less than"
+        assert node1 < node2  # h_cost thấp hơn nên "nhỏ hơn"
 
 
 class TestGreedyBestFirstSearch:
-    """Tests for GBFS algorithm."""
+    """Kiểm thử cho thuật toán GBFS."""
 
     def test_algorithm_type(self):
-        """Test algorithm type property."""
+        """Kiểm tra thuộc tính loại thuật toán."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
         assert gbfs.algorithm_type == AlgorithmType.GBFS
 
     def test_heuristic_calculation(self):
-        """Test heuristic function."""
+        """Kiểm tra hàm heuristic."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
         node = network.get_node("n1")
         shelter = network.get_shelters()[0]
         h = gbfs.heuristic(node, shelter, {})
-        assert h >= 0  # Heuristic should be non-negative
+        assert h >= 0  # Heuristic phải không âm
 
     def test_find_path_simple(self):
-        """Test finding a path in simple network."""
+        """Kiểm tra tìm đường đi trong mạng lưới đơn giản."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
@@ -299,7 +299,7 @@ class TestGreedyBestFirstSearch:
         assert cost < float('inf')
 
     def test_find_path_no_shelters(self):
-        """Test finding path with no shelters returns None."""
+        """Kiểm tra tìm đường với không có nơi trú ẩn trả về None."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
@@ -311,7 +311,7 @@ class TestGreedyBestFirstSearch:
         assert cost == float('inf')
 
     def test_optimize_creates_plan(self):
-        """Test that optimize creates a valid evacuation plan."""
+        """Kiểm tra optimize tạo kế hoạch sơ tán hợp lệ."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
@@ -323,7 +323,7 @@ class TestGreedyBestFirstSearch:
         assert metrics.routes_found > 0
 
     def test_optimize_respects_capacity(self):
-        """Test that optimization respects shelter capacity."""
+        """Kiểm tra tối ưu hóa tôn trọng sức chứa nơi trú ẩn."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
@@ -335,7 +335,7 @@ class TestGreedyBestFirstSearch:
                 assert shelter_loads[shelter.id] <= shelter.capacity
 
     def test_find_multiple_paths(self):
-        """Test finding multiple paths."""
+        """Kiểm tra tìm nhiều đường đi."""
         network = create_simple_network()
         gbfs = GreedyBestFirstSearch(network)
 
@@ -345,23 +345,23 @@ class TestGreedyBestFirstSearch:
         paths = gbfs.find_multiple_paths(zone, shelters, k=2)
         assert len(paths) <= 2
         if len(paths) == 2:
-            assert paths[0][1].id != paths[1][1].id  # Different shelters
+            assert paths[0][1].id != paths[1][1].id  # Các nơi trú ẩn khác nhau
 
 
-# ==================== GWO Tests ====================
+# ==================== Kiểm Thử GWO ====================
 
 class TestWolf:
-    """Tests for GWO Wolf class."""
+    """Kiểm thử cho lớp Wolf của GWO."""
 
     def test_wolf_creation(self):
-        """Test wolf creation."""
+        """Kiểm tra tạo sói."""
         position = np.array([[0.5, 0.5], [0.3, 0.7]])
         wolf = Wolf(position=position, fitness=100.0)
         assert wolf.fitness == 100.0
         assert wolf.position.shape == (2, 2)
 
     def test_wolf_copy(self):
-        """Test wolf copy creates independent copy."""
+        """Kiểm tra sao chép sói tạo bản sao độc lập."""
         position = np.array([[0.5, 0.5]])
         wolf = Wolf(position=position, fitness=100.0)
         copy = wolf.copy()
@@ -374,16 +374,16 @@ class TestWolf:
 
 
 class TestGreyWolfOptimizer:
-    """Tests for GWO algorithm."""
+    """Kiểm thử cho thuật toán GWO."""
 
     def test_algorithm_type(self):
-        """Test algorithm type property."""
+        """Kiểm tra thuộc tính loại thuật toán."""
         network = create_simple_network()
         gwo = GreyWolfOptimizer(network)
         assert gwo.algorithm_type == AlgorithmType.GWO
 
     def test_initialize_population(self):
-        """Test population initialization."""
+        """Kiểm tra khởi tạo quần thể."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=10, max_iterations=5)
         gwo = GreyWolfOptimizer(network, config)
@@ -397,7 +397,7 @@ class TestGreyWolfOptimizer:
         assert gwo.delta is not None
 
     def test_wolf_positions_normalized(self):
-        """Test that wolf positions are normalized (rows sum to 1)."""
+        """Kiểm tra vị trí sói được chuẩn hóa (tổng hàng bằng 1)."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=5, max_iterations=5)
         gwo = GreyWolfOptimizer(network, config)
@@ -410,7 +410,7 @@ class TestGreyWolfOptimizer:
             np.testing.assert_array_almost_equal(row_sums, np.ones_like(row_sums))
 
     def test_fitness_calculation(self):
-        """Test fitness calculation."""
+        """Kiểm tra tính toán độ thích nghi."""
         network = create_simple_network()
         gwo = GreyWolfOptimizer(network)
 
@@ -422,7 +422,7 @@ class TestGreyWolfOptimizer:
         assert fitness < float('inf')
 
     def test_optimize_creates_plan(self):
-        """Test that optimize creates a valid plan."""
+        """Kiểm tra optimize tạo kế hoạch hợp lệ."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=10, max_iterations=10)
         gwo = GreyWolfOptimizer(network, config)
@@ -434,22 +434,22 @@ class TestGreyWolfOptimizer:
         assert len(metrics.convergence_history) > 0
 
     def test_convergence_improves(self):
-        """Test that fitness generally improves over iterations."""
+        """Kiểm tra độ thích nghi thường cải thiện qua các vòng lặp."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=20, max_iterations=30)
         gwo = GreyWolfOptimizer(network, config)
 
         _, metrics = gwo.optimize()
 
-        # First fitness should be >= last (improvement)
+        # Độ thích nghi đầu nên >= cuối (cải thiện)
         if len(metrics.convergence_history) > 5:
             first_avg = np.mean(metrics.convergence_history[:5])
             last_avg = np.mean(metrics.convergence_history[-5:])
-            # Allow for some variance, but generally should improve
+            # Cho phép một số biến động, nhưng nên cải thiện
             assert last_avg <= first_avg * 1.5
 
     def test_get_flow_matrix(self):
-        """Test getting the optimized flow matrix."""
+        """Kiểm tra lấy ma trận lưu lượng tối ưu."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=5, max_iterations=5)
         gwo = GreyWolfOptimizer(network, config)
@@ -462,19 +462,19 @@ class TestGreyWolfOptimizer:
                                      len(network.get_shelters()))
 
 
-# ==================== Hybrid Algorithm Tests ====================
+# ==================== Kiểm Thử Thuật Toán Hybrid ====================
 
 class TestHybridGBFSGWO:
-    """Tests for Hybrid algorithm."""
+    """Kiểm thử cho thuật toán Hybrid."""
 
     def test_algorithm_type(self):
-        """Test algorithm type property."""
+        """Kiểm tra thuộc tính loại thuật toán."""
         network = create_simple_network()
         hybrid = HybridGBFSGWO(network)
         assert hybrid.algorithm_type == AlgorithmType.HYBRID
 
     def test_optimize_creates_plan(self):
-        """Test that optimize creates a valid plan."""
+        """Kiểm tra optimize tạo kế hoạch hợp lệ."""
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=10,
@@ -489,7 +489,7 @@ class TestHybridGBFSGWO:
         assert metrics.execution_time_seconds >= 0
 
     def test_hybrid_uses_both_algorithms(self):
-        """Test that hybrid uses both GWO and GBFS."""
+        """Kiểm tra hybrid sử dụng cả GWO và GBFS."""
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=5,
@@ -500,15 +500,15 @@ class TestHybridGBFSGWO:
 
         plan, _ = hybrid.optimize()
 
-        # Hybrid should produce actual paths (not just zone->shelter)
+        # Hybrid nên tạo đường đi thực tế (không chỉ khu dân cư->nơi trú ẩn)
         for route in plan.routes:
-            # Paths from hybrid should have intermediate nodes
-            # (unlike pure GWO which only has start/end)
+            # Đường từ hybrid nên có các node trung gian
+            # (khác với GWO thuần chỉ có điểm đầu/cuối)
             if route.path:
                 assert len(route.path) >= 2
 
     def test_progress_callback(self):
-        """Test progress callback is called."""
+        """Kiểm tra callback tiến độ được gọi."""
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=5,
@@ -528,13 +528,13 @@ class TestHybridGBFSGWO:
         assert len(progress_updates) > 0
 
 
-# ==================== Comparator Tests ====================
+# ==================== Kiểm Thử Comparator ====================
 
 class TestComparisonResult:
-    """Tests for ComparisonResult."""
+    """Kiểm thử cho ComparisonResult."""
 
     def test_get_metric_comparison(self):
-        """Test getting metric comparison across algorithms."""
+        """Kiểm tra lấy so sánh chỉ số giữa các thuật toán."""
         result = ComparisonResult()
         result.metrics[AlgorithmType.GBFS] = AlgorithmMetrics(
             algorithm_type=AlgorithmType.GBFS,
@@ -550,7 +550,7 @@ class TestComparisonResult:
         assert comparison[AlgorithmType.GWO] == 1.5
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
+        """Kiểm tra tuần tự hóa sang từ điển."""
         result = ComparisonResult(
             algorithms=[AlgorithmType.GBFS, AlgorithmType.GWO],
             winner=AlgorithmType.GBFS,
@@ -562,10 +562,10 @@ class TestComparisonResult:
 
 
 class TestAlgorithmComparator:
-    """Tests for AlgorithmComparator."""
+    """Kiểm thử cho AlgorithmComparator."""
 
     def test_compare_single_algorithm(self):
-        """Test comparing a single algorithm."""
+        """Kiểm tra so sánh một thuật toán đơn."""
         network = create_simple_network()
         comparator = AlgorithmComparator(network)
 
@@ -575,7 +575,7 @@ class TestAlgorithmComparator:
         assert AlgorithmType.GBFS in result.metrics
 
     def test_compare_all(self):
-        """Test comparing all algorithms."""
+        """Kiểm tra so sánh tất cả thuật toán."""
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=5,
@@ -594,7 +594,7 @@ class TestAlgorithmComparator:
         assert result.winner is not None
 
     def test_rankings_calculated(self):
-        """Test that rankings are calculated."""
+        """Kiểm tra xếp hạng được tính toán."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=5, max_iterations=5)
         comparator = AlgorithmComparator(network, config)
@@ -605,7 +605,7 @@ class TestAlgorithmComparator:
         assert 'execution_time' in result.rankings
 
     def test_generate_comparison_table(self):
-        """Test generating comparison table."""
+        """Kiểm tra tạo bảng so sánh."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=5, max_iterations=5)
         comparator = AlgorithmComparator(network, config)
@@ -618,13 +618,13 @@ class TestAlgorithmComparator:
         assert 'GWO' in table
 
 
-# ==================== Integration Tests ====================
+# ==================== Kiểm Thử Tích Hợp ====================
 
 class TestAlgorithmIntegration:
-    """Integration tests for algorithms working together."""
+    """Kiểm thử tích hợp cho các thuật toán hoạt động cùng nhau."""
 
     def test_all_algorithms_produce_valid_plans(self):
-        """Test that all algorithms produce valid evacuation plans."""
+        """Kiểm tra tất cả thuật toán tạo kế hoạch sơ tán hợp lệ."""
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=10,
@@ -642,34 +642,34 @@ class TestAlgorithmIntegration:
         for algo in algorithms:
             plan, metrics = algo.optimize()
 
-            # Each algorithm should produce routes
-            assert plan is not None, f"{algo.algorithm_type} failed to produce plan"
+            # Mỗi thuật toán nên tạo tuyến đường
+            assert plan is not None, f"{algo.algorithm_type} thất bại trong việc tạo kế hoạch"
 
-            # Total evacuees should be positive
+            # Tổng số người sơ tán phải dương
             assert plan.total_evacuees >= 0
 
-            # Metrics should be recorded
+            # Chỉ số nên được ghi lại
             assert metrics.execution_time_seconds >= 0
 
     def test_algorithms_handle_hazards(self):
-        """Test that algorithms can handle hazard zones."""
+        """Kiểm tra thuật toán có thể xử lý vùng nguy hiểm."""
         network = create_network_with_hazard()
         config = AlgorithmConfig(n_wolves=10, max_iterations=10)
 
         gbfs = GreedyBestFirstSearch(network, config)
         plan, _ = gbfs.optimize()
 
-        # Should still find paths even with hazards
+        # Vẫn nên tìm được đường đi ngay cả có vùng nguy hiểm
         assert len(plan.routes) > 0
 
     def test_stop_functionality(self):
-        """Test that algorithms can be stopped."""
+        """Kiểm tra thuật toán có thể bị dừng."""
         network = create_simple_network()
         config = AlgorithmConfig(n_wolves=50, max_iterations=1000)
 
         gwo = GreyWolfOptimizer(network, config)
 
-        # Set up callback to stop after 5 iterations
+        # Thiết lập callback để dừng sau 5 vòng lặp
         iteration_count = [0]
 
         def callback(iteration, cost, data):
@@ -680,7 +680,7 @@ class TestAlgorithmIntegration:
         gwo.set_progress_callback(callback)
         gwo.optimize()
 
-        # Should have stopped early
+        # Nên dừng sớm
         assert iteration_count[0] < 100
 
 

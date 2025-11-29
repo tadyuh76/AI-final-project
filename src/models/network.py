@@ -1,6 +1,6 @@
 """
-Network graph model for the evacuation system.
-Wraps NetworkX graph with domain-specific functionality.
+Mô hình đồ thị mạng lưới cho hệ thống sơ tán.
+Bao bọc đồ thị NetworkX với chức năng chuyên biệt cho lĩnh vực.
 """
 
 from typing import Dict, List, Optional, Tuple, Iterator, Set
@@ -23,7 +23,7 @@ from .edge import Edge, RoadType
 
 @dataclass
 class NetworkStats:
-    """Statistics about the network."""
+    """Thống kê về mạng lưới."""
     total_nodes: int = 0
     total_edges: int = 0
     population_zones: int = 0
@@ -36,40 +36,40 @@ class NetworkStats:
 
 class EvacuationNetwork:
     """
-    Graph representation of the evacuation network.
-    Contains nodes (zones, shelters, intersections) and edges (roads).
+    Biểu diễn đồ thị của mạng lưới sơ tán.
+    Chứa các nút (khu vực, nơi trú ẩn, giao lộ) và các cạnh (đường).
     """
 
     def __init__(self):
-        """Initialize empty network."""
-        # Core graph structure
+        """Khởi tạo mạng lưới trống."""
+        # Cấu trúc đồ thị cốt lõi
         if HAS_NETWORKX:
             self._graph = nx.DiGraph()
         else:
             self._graph = None
             self._adjacency: Dict[str, Dict[str, str]] = {}  # node_id -> {neighbor_id: edge_id}
 
-        # Node storage by type
+        # Lưu trữ nút theo loại
         self._nodes: Dict[str, Node] = {}
         self._population_zones: Dict[str, PopulationZone] = {}
         self._shelters: Dict[str, Shelter] = {}
 
-        # Edge storage
+        # Lưu trữ cạnh
         self._edges: Dict[str, Edge] = {}
 
-        # Hazard zones (not part of graph, but affect edge costs)
+        # Vùng nguy hiểm (không phải phần của đồ thị, nhưng ảnh hưởng chi phí cạnh)
         self._hazard_zones: List[HazardZone] = []
 
-        # Bounds for visualization
+        # Giới hạn cho trực quan hóa
         self._min_lat: float = float('inf')
         self._max_lat: float = float('-inf')
         self._min_lon: float = float('inf')
         self._max_lon: float = float('-inf')
 
-    # ==================== Node Operations ====================
+    # ==================== Thao tác Nút ====================
 
     def add_node(self, node: Node) -> None:
-        """Add a node to the network."""
+        """Thêm một nút vào mạng lưới."""
         self._nodes[node.id] = node
         self._update_bounds(node.lat, node.lon)
 
@@ -79,36 +79,36 @@ class EvacuationNetwork:
             if node.id not in self._adjacency:
                 self._adjacency[node.id] = {}
 
-        # Track by type
+        # Theo dõi theo loại
         if isinstance(node, PopulationZone):
             self._population_zones[node.id] = node
         elif isinstance(node, Shelter):
             self._shelters[node.id] = node
 
     def get_node(self, node_id: str) -> Optional[Node]:
-        """Get a node by ID."""
+        """Lấy một nút theo ID."""
         return self._nodes.get(node_id)
 
     def get_nodes(self) -> Iterator[Node]:
-        """Iterate over all nodes."""
+        """Lặp qua tất cả các nút."""
         return iter(self._nodes.values())
 
     def get_population_zones(self) -> List[PopulationZone]:
-        """Get all population zones."""
+        """Lấy tất cả các khu vực dân cư."""
         return list(self._population_zones.values())
 
     def get_shelters(self) -> List[Shelter]:
-        """Get all shelters."""
+        """Lấy tất cả các nơi trú ẩn."""
         return list(self._shelters.values())
 
     def get_active_shelters(self) -> List[Shelter]:
-        """Get shelters that are active and have capacity."""
+        """Lấy các nơi trú ẩn đang hoạt động và có sức chứa."""
         return [s for s in self._shelters.values() if s.is_active and s.has_capacity()]
 
-    # ==================== Edge Operations ====================
+    # ==================== Thao tác Cạnh ====================
 
     def add_edge(self, edge: Edge) -> None:
-        """Add an edge to the network."""
+        """Thêm một cạnh vào mạng lưới."""
         self._edges[edge.id] = edge
 
         if HAS_NETWORKX:
@@ -126,11 +126,11 @@ class EvacuationNetwork:
                 self._adjacency[edge.target_id][edge.source_id] = edge.id
 
     def get_edge(self, edge_id: str) -> Optional[Edge]:
-        """Get an edge by ID."""
+        """Lấy một cạnh theo ID."""
         return self._edges.get(edge_id)
 
     def get_edge_between(self, source_id: str, target_id: str) -> Optional[Edge]:
-        """Get edge between two nodes."""
+        """Lấy cạnh giữa hai nút."""
         if HAS_NETWORKX and self._graph.has_edge(source_id, target_id):
             edge_id = self._graph[source_id][target_id].get('edge_id')
             return self._edges.get(edge_id)
@@ -141,18 +141,18 @@ class EvacuationNetwork:
         return None
 
     def get_edges(self) -> Iterator[Edge]:
-        """Iterate over all edges."""
+        """Lặp qua tất cả các cạnh."""
         return iter(self._edges.values())
 
     def get_neighbors(self, node_id: str) -> List[str]:
-        """Get neighbor node IDs for a node."""
+        """Lấy các ID nút láng giềng cho một nút."""
         if HAS_NETWORKX:
             return list(self._graph.successors(node_id))
         else:
             return list(self._adjacency.get(node_id, {}).keys())
 
     def get_outgoing_edges(self, node_id: str) -> List[Edge]:
-        """Get all outgoing edges from a node."""
+        """Lấy tất cả các cạnh đi ra từ một nút."""
         edges = []
         for neighbor_id in self.get_neighbors(node_id):
             edge = self.get_edge_between(node_id, neighbor_id)
@@ -160,39 +160,39 @@ class EvacuationNetwork:
                 edges.append(edge)
         return edges
 
-    # ==================== Hazard Operations ====================
+    # ==================== Thao tác Vùng nguy hiểm ====================
 
     def add_hazard_zone(self, hazard: HazardZone) -> None:
-        """Add a hazard zone."""
+        """Thêm một vùng nguy hiểm."""
         self._hazard_zones.append(hazard)
         self._update_edge_risks()
 
     def remove_hazard_zone(self, index: int) -> None:
-        """Remove a hazard zone by index."""
+        """Loại bỏ một vùng nguy hiểm theo chỉ số."""
         if 0 <= index < len(self._hazard_zones):
             self._hazard_zones.pop(index)
             self._update_edge_risks()
 
     def get_hazard_zones(self) -> List[HazardZone]:
-        """Get all hazard zones."""
+        """Lấy tất cả các vùng nguy hiểm."""
         return self._hazard_zones
 
     def clear_hazard_zones(self) -> None:
-        """Clear all hazard zones."""
+        """Xóa tất cả các vùng nguy hiểm."""
         self._hazard_zones.clear()
         for edge in self._edges.values():
             edge.set_flood_risk(0.0)
             edge.is_blocked = False
 
     def _update_edge_risks(self) -> None:
-        """Update edge flood risks based on hazard zones."""
+        """Cập nhật rủi ro lũ lụt của cạnh dựa trên vùng nguy hiểm."""
         for edge in self._edges.values():
             source = self._nodes.get(edge.source_id)
             target = self._nodes.get(edge.target_id)
             if not source or not target:
                 continue
 
-            # Calculate risk at midpoint of edge
+            # Tính rủi ro tại điểm giữa của cạnh
             mid_lat = (source.lat + target.lat) / 2
             mid_lon = (source.lon + target.lon) / 2
 
@@ -203,49 +203,49 @@ class EvacuationNetwork:
 
             edge.set_flood_risk(max_risk)
 
-    # ==================== Cost Calculations ====================
+    # ==================== Tính toán Chi phí ====================
 
     def get_edge_cost(self, source_id: str, target_id: str,
                       risk_weight: float = 0.3) -> float:
-        """Get the cost of traversing an edge."""
+        """Lấy chi phí để đi qua một cạnh."""
         edge = self.get_edge_between(source_id, target_id)
         if not edge:
             return float('inf')
         return edge.get_cost(risk_weight)
 
     def get_total_risk_at(self, lat: float, lon: float) -> float:
-        """Get combined risk level at a point from all hazard zones."""
+        """Lấy mức độ rủi ro kết hợp tại một điểm từ tất cả các vùng nguy hiểm."""
         total_risk = 0.0
         for hazard in self._hazard_zones:
             total_risk = max(total_risk, hazard.get_risk_at(lat, lon))
         return min(1.0, total_risk)
 
-    # ==================== State Management ====================
+    # ==================== Quản lý Trạng thái ====================
 
     def reset_simulation_state(self) -> None:
-        """Reset all dynamic state (flows, occupancy, evacuated counts)."""
-        # Reset edge flows
+        """Đặt lại tất cả trạng thái động (luồng, lấp đầy, số lượng đã sơ tán)."""
+        # Đặt lại luồng cạnh
         for edge in self._edges.values():
             edge.reset_flow()
 
-        # Reset shelter occupancy
+        # Đặt lại lấp đầy nơi trú ẩn
         for shelter in self._shelters.values():
             shelter.current_occupancy = 0
 
-        # Reset evacuated counts
+        # Đặt lại số lượng đã sơ tán
         for zone in self._population_zones.values():
             zone.evacuated = 0
 
     def reset_hazards(self) -> None:
-        """Reset hazard effects on edges."""
+        """Đặt lại ảnh hưởng của nguy hiểm trên các cạnh."""
         for edge in self._edges.values():
             edge.flood_risk = 0.0
             edge.is_blocked = False
 
-    # ==================== Statistics ====================
+    # ==================== Thống kê ====================
 
     def get_stats(self) -> NetworkStats:
-        """Get network statistics."""
+        """Lấy thống kê mạng lưới."""
         stats = NetworkStats()
         stats.total_nodes = len(self._nodes)
         stats.total_edges = len(self._edges)
@@ -257,31 +257,31 @@ class EvacuationNetwork:
         stats.blocked_edges = sum(1 for e in self._edges.values() if e.is_blocked)
         return stats
 
-    # ==================== Bounds ====================
+    # ==================== Giới hạn ====================
 
     def _update_bounds(self, lat: float, lon: float) -> None:
-        """Update geographic bounds."""
+        """Cập nhật giới hạn địa lý."""
         self._min_lat = min(self._min_lat, lat)
         self._max_lat = max(self._max_lat, lat)
         self._min_lon = min(self._min_lon, lon)
         self._max_lon = max(self._max_lon, lon)
 
     def get_bounds(self) -> Tuple[float, float, float, float]:
-        """Get geographic bounds (min_lat, max_lat, min_lon, max_lon)."""
+        """Lấy giới hạn địa lý (min_lat, max_lat, min_lon, max_lon)."""
         return (self._min_lat, self._max_lat, self._min_lon, self._max_lon)
 
     def get_center(self) -> Tuple[float, float]:
-        """Get geographic center."""
+        """Lấy tâm địa lý."""
         return (
             (self._min_lat + self._max_lat) / 2,
             (self._min_lon + self._max_lon) / 2
         )
 
-    # ==================== Pathfinding Helpers ====================
+    # ==================== Trợ giúp Tìm đường ====================
 
     def find_nearest_node(self, lat: float, lon: float,
                           node_type: Optional[NodeType] = None) -> Optional[Node]:
-        """Find the nearest node to a given point."""
+        """Tìm nút gần nhất đến một điểm cho trước."""
         min_dist = float('inf')
         nearest = None
 
@@ -298,7 +298,7 @@ class EvacuationNetwork:
 
     def find_nearest_shelter(self, lat: float, lon: float,
                             min_capacity: int = 1) -> Optional[Shelter]:
-        """Find the nearest shelter with available capacity."""
+        """Tìm nơi trú ẩn gần nhất có sức chứa khả dụng."""
         min_dist = float('inf')
         nearest = None
 
@@ -313,10 +313,10 @@ class EvacuationNetwork:
 
         return nearest
 
-    # ==================== Serialization ====================
+    # ==================== Tuần tự hóa ====================
 
     def to_dict(self) -> dict:
-        """Convert network to dictionary for serialization."""
+        """Chuyển đổi mạng lưới thành từ điển để tuần tự hóa."""
         return {
             'nodes': [
                 {
@@ -359,19 +359,19 @@ class EvacuationNetwork:
         }
 
     def save_to_file(self, filepath: str) -> None:
-        """Save network to JSON file."""
+        """Lưu mạng lưới vào tệp JSON."""
         with open(filepath, 'w') as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
     def load_from_file(cls, filepath: str) -> 'EvacuationNetwork':
-        """Load network from JSON file."""
+        """Tải mạng lưới từ tệp JSON."""
         with open(filepath, 'r') as f:
             data = json.load(f)
 
         network = cls()
 
-        # Load nodes
+        # Tải các nút
         for node_data in data.get('nodes', []):
             node_type = NodeType(node_data['type'])
             if node_type == NodeType.POPULATION_ZONE:
@@ -402,7 +402,7 @@ class EvacuationNetwork:
                 )
             network.add_node(node)
 
-        # Load edges
+        # Tải các cạnh
         for edge_data in data.get('edges', []):
             edge = Edge(
                 id=edge_data['id'],
@@ -417,7 +417,7 @@ class EvacuationNetwork:
             )
             network.add_edge(edge)
 
-        # Load hazards
+        # Tải các vùng nguy hiểm
         for hazard_data in data.get('hazards', []):
             hazard = HazardZone(
                 center_lat=hazard_data['center_lat'],
@@ -431,7 +431,7 @@ class EvacuationNetwork:
         return network
 
     def __len__(self) -> int:
-        """Return number of nodes."""
+        """Trả về số lượng nút."""
         return len(self._nodes)
 
     def __repr__(self) -> str:

@@ -1,6 +1,6 @@
 """
-Node models for the evacuation network.
-Defines different types of nodes: Population Zones, Shelters, Intersections, and Hazard Zones.
+Các mô hình nút cho mạng lưới sơ tán.
+Định nghĩa các loại nút khác nhau: Khu vực dân cư, Nơi trú ẩn, Giao lộ và Vùng nguy hiểm.
 """
 
 from dataclasses import dataclass, field
@@ -10,16 +10,16 @@ import math
 
 
 class NodeType(Enum):
-    """Types of nodes in the evacuation network."""
-    POPULATION_ZONE = "population_zone"  # Source nodes with people to evacuate
-    SHELTER = "shelter"                   # Sink nodes with capacity limits
-    INTERSECTION = "intersection"         # Regular road intersections
-    HAZARD = "hazard"                     # High-risk areas (flooding, etc.)
+    """Các loại nút trong mạng lưới sơ tán."""
+    POPULATION_ZONE = "population_zone"  # Nút nguồn có người cần sơ tán
+    SHELTER = "shelter"                   # Nút đích có giới hạn sức chứa
+    INTERSECTION = "intersection"         # Giao lộ đường thông thường
+    HAZARD = "hazard"                     # Khu vực nguy hiểm cao (lũ lụt, v.v.)
 
 
 @dataclass
 class Node:
-    """Base node class representing a point in the network."""
+    """Lớp nút cơ bản đại diện cho một điểm trong mạng lưới."""
     id: str
     lat: float
     lon: float
@@ -28,17 +28,17 @@ class Node:
 
     @property
     def pos(self) -> Tuple[float, float]:
-        """Return position as (lat, lon) tuple."""
+        """Trả về vị trí dưới dạng tuple (lat, lon)."""
         return (self.lat, self.lon)
 
     def distance_to(self, other: 'Node') -> float:
-        """Calculate haversine distance to another node in kilometers."""
+        """Tính khoảng cách haversine đến nút khác theo kilômét."""
         return haversine_distance(self.lat, self.lon, other.lat, other.lon)
 
 
 @dataclass
 class PopulationZone(Node):
-    """A population zone that needs evacuation."""
+    """Khu vực dân cư cần sơ tán."""
     population: int = 0
     evacuated: int = 0
     district_name: str = ""
@@ -48,12 +48,12 @@ class PopulationZone(Node):
 
     @property
     def remaining_population(self) -> int:
-        """People still needing evacuation."""
+        """Số người vẫn còn cần sơ tán."""
         return max(0, self.population - self.evacuated)
 
     @property
     def evacuation_progress(self) -> float:
-        """Progress from 0.0 to 1.0."""
+        """Tiến độ từ 0.0 đến 1.0."""
         if self.population == 0:
             return 1.0
         return self.evacuated / self.population
@@ -61,10 +61,10 @@ class PopulationZone(Node):
 
 @dataclass
 class Shelter(Node):
-    """An evacuation shelter with limited capacity."""
+    """Nơi trú ẩn sơ tán với sức chứa giới hạn."""
     capacity: int = 1000
     current_occupancy: int = 0
-    shelter_type: str = "general"  # school, hospital, stadium, etc.
+    shelter_type: str = "general"  # trường học, bệnh viện, sân vận động, v.v.
     is_active: bool = True
 
     def __post_init__(self):
@@ -72,22 +72,22 @@ class Shelter(Node):
 
     @property
     def available_capacity(self) -> int:
-        """Remaining capacity."""
+        """Sức chứa còn lại."""
         return max(0, self.capacity - self.current_occupancy)
 
     @property
     def occupancy_rate(self) -> float:
-        """Occupancy from 0.0 to 1.0."""
+        """Tỷ lệ lấp đầy từ 0.0 đến 1.0."""
         if self.capacity == 0:
             return 1.0
         return self.current_occupancy / self.capacity
 
     def has_capacity(self, amount: int = 1) -> bool:
-        """Check if shelter can accept more evacuees."""
+        """Kiểm tra xem nơi trú ẩn có thể tiếp nhận thêm người sơ tán hay không."""
         return self.is_active and self.available_capacity >= amount
 
     def admit(self, count: int) -> int:
-        """Admit evacuees, returns actual number admitted."""
+        """Tiếp nhận người sơ tán, trả về số lượng thực tế được tiếp nhận."""
         admitted = min(count, self.available_capacity)
         self.current_occupancy += admitted
         return admitted
@@ -95,12 +95,12 @@ class Shelter(Node):
 
 @dataclass
 class HazardZone:
-    """Represents a hazardous area (flooding, storm damage, etc.)."""
+    """Đại diện cho khu vực nguy hiểm (lũ lụt, thiệt hại do bão, v.v.)."""
     center_lat: float
     center_lon: float
-    radius_km: float  # Radius of effect in kilometers
-    risk_level: float = 0.8  # 0.0 to 1.0, higher = more dangerous
-    hazard_type: str = "flood"  # flood, wind, debris, etc.
+    radius_km: float  # Bán kính ảnh hưởng tính bằng kilômét
+    risk_level: float = 0.8  # 0.0 đến 1.0, càng cao = càng nguy hiểm
+    hazard_type: str = "flood"  # lũ lụt, gió, mảnh vỡ, v.v.
     is_active: bool = True
 
     @property
@@ -108,7 +108,7 @@ class HazardZone:
         return (self.center_lat, self.center_lon)
 
     def get_risk_at(self, lat: float, lon: float) -> float:
-        """Calculate risk level at a given point (decreases with distance)."""
+        """Tính mức độ rủi ro tại một điểm cho trước (giảm dần theo khoảng cách)."""
         if not self.is_active:
             return 0.0
 
@@ -116,17 +116,17 @@ class HazardZone:
         if dist >= self.radius_km:
             return 0.0
 
-        # Linear falloff from center to edge
+        # Giảm tuyến tính từ tâm đến rìa
         distance_factor = 1.0 - (dist / self.radius_km)
         return self.risk_level * distance_factor
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
-    Calculate the great-circle distance between two points in kilometers.
-    Uses the Haversine formula.
+    Tính khoảng cách đại quyến giữa hai điểm theo kilômét.
+    Sử dụng công thức Haversine.
     """
-    R = 6371.0  # Earth's radius in kilometers
+    R = 6371.0  # Bán kính Trái Đất tính bằng kilômét
 
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
@@ -140,9 +140,9 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c
 
 
-# Coordinate conversion utilities for visualization
+# Tiện ích chuyển đổi tọa độ cho trực quan hóa
 def lat_lon_to_mercator(lat: float, lon: float) -> Tuple[float, float]:
-    """Convert lat/lon to Web Mercator coordinates for visualization."""
+    """Chuyển đổi lat/lon sang tọa độ Web Mercator cho trực quan hóa."""
     x = lon * 20037508.34 / 180.0
     y = math.log(math.tan((90 + lat) * math.pi / 360.0)) / (math.pi / 180.0)
     y = y * 20037508.34 / 180.0
@@ -150,7 +150,7 @@ def lat_lon_to_mercator(lat: float, lon: float) -> Tuple[float, float]:
 
 
 def mercator_to_lat_lon(x: float, y: float) -> Tuple[float, float]:
-    """Convert Web Mercator coordinates back to lat/lon."""
+    """Chuyển đổi tọa độ Web Mercator ngược về lat/lon."""
     lon = x * 180.0 / 20037508.34
     lat = y * 180.0 / 20037508.34
     lat = 180.0 / math.pi * (2 * math.atan(math.exp(lat * math.pi / 180.0)) - math.pi / 2)

@@ -1,13 +1,13 @@
 """
-Hybrid GBFS + GWO Algorithm for evacuation optimization.
+Thuật toán Hybrid GBFS + GWO cho tối ưu hóa sơ tán.
 
-Combines the strengths of both algorithms:
-- GWO: Global optimization of flow distribution
-- GBFS: Local pathfinding with multi-objective heuristic
+Kết hợp điểm mạnh của cả hai thuật toán:
+- GWO: Tối ưu hóa toàn cục của phân phối luồng
+- GBFS: Tìm đường cục bộ với heuristic đa mục tiêu
 
-Two-phase approach:
-1. Phase 1 (GWO): Optimize which zones send people to which shelters
-2. Phase 2 (GBFS): Find actual paths for each flow assignment
+Phương pháp hai giai đoạn:
+1. Giai đoạn 1 (GWO): Tối ưu hóa việc các khu vực gửi người đến nơi trú ẩn nào
+2. Giai đoạn 2 (GBFS): Tìm đường đi thực tế cho mỗi phân công luồng
 """
 
 from typing import List, Dict, Optional, Tuple, Any
@@ -27,29 +27,29 @@ from ..models.node import PopulationZone, Shelter
 
 class HybridGBFSGWO(BaseAlgorithm):
     """
-    Hybrid algorithm combining GWO global optimization with GBFS pathfinding.
+    Thuật toán Hybrid kết hợp tối ưu hóa toàn cục GWO với tìm đường GBFS.
 
-    Phase 1: GWO determines optimal flow distribution
-    Phase 2: GBFS finds actual paths for each assignment
-    Refinement: Iteratively improve based on actual path costs
+    Giai đoạn 1: GWO xác định phân phối luồng tối ưu
+    Giai đoạn 2: GBFS tìm đường đi thực tế cho mỗi phân công
+    Tinh chỉnh: Cải thiện lặp lại dựa trên chi phí đường đi thực tế
     """
 
     def __init__(self, network: EvacuationNetwork, config: Optional[AlgorithmConfig] = None):
         """
-        Initialize hybrid algorithm.
+        Khởi tạo thuật toán hybrid.
 
         Args:
-            network: The evacuation network
-            config: Algorithm configuration (optional)
+            network: Mạng lưới sơ tán
+            config: Cấu hình thuật toán (tùy chọn)
         """
         super().__init__(network)
         self.config = config or AlgorithmConfig()
 
-        # Create sub-algorithms
+        # Tạo các thuật toán con
         self.gwo = GreyWolfOptimizer(network, config)
         self.gbfs = GreedyBestFirstSearch(network, config)
 
-        # Hybrid-specific parameters
+        # Các tham số đặc thù cho Hybrid
         self.gwo_iterations = self.config.gwo_iterations
         self.refinement_iterations = self.config.refinement_iterations
 
@@ -59,10 +59,10 @@ class HybridGBFSGWO(BaseAlgorithm):
 
     def optimize(self, **kwargs) -> Tuple[EvacuationPlan, AlgorithmMetrics]:
         """
-        Run hybrid optimization.
+        Chạy tối ưu hóa hybrid.
 
         Returns:
-            Tuple of (EvacuationPlan, AlgorithmMetrics)
+            Tuple của (EvacuationPlan, AlgorithmMetrics)
         """
         start_time = self._start_timer()
 
@@ -73,10 +73,10 @@ class HybridGBFSGWO(BaseAlgorithm):
             self._stop_timer(start_time)
             return EvacuationPlan(algorithm_type=AlgorithmType.HYBRID), self._metrics
 
-        # ============ Phase 1: GWO Global Optimization ============
+        # ============ Giai đoạn 1: Tối ưu hóa Toàn cục GWO ============
         self.report_progress(0, float('inf'), {'phase': 'gwo_start'})
 
-        # Configure GWO for fewer iterations in hybrid mode
+        # Cấu hình GWO cho ít vòng lặp hơn trong chế độ hybrid
         gwo_config = AlgorithmConfig(
             n_wolves=self.config.n_wolves,
             max_iterations=self.gwo_iterations,
@@ -85,14 +85,14 @@ class HybridGBFSGWO(BaseAlgorithm):
         )
         self.gwo = GreyWolfOptimizer(self.network, gwo_config)
 
-        # Set up progress forwarding
+        # Thiết lập chuyển tiếp tiến trình
         def gwo_progress(iteration: int, cost: float, data: Any) -> None:
             self._metrics.convergence_history.append(cost)
             self.report_progress(iteration, cost, {'phase': 'gwo', 'data': data})
 
         self.gwo.set_progress_callback(gwo_progress)
 
-        # Run GWO
+        # Chạy GWO
         gwo_plan, gwo_metrics = self.gwo.optimize()
         flow_matrix = self.gwo.get_flow_matrix()
 
@@ -100,12 +100,12 @@ class HybridGBFSGWO(BaseAlgorithm):
             self._stop_timer(start_time)
             return gwo_plan, self._metrics
 
-        # ============ Phase 2: GBFS Pathfinding ============
+        # ============ Giai đoạn 2: Tìm đường GBFS ============
         self.report_progress(self.gwo_iterations, gwo_metrics.final_cost, {'phase': 'gbfs_start'})
 
         plan = self._apply_gbfs_pathfinding(flow_matrix, zones, shelters)
 
-        # ============ Phase 3: Refinement ============
+        # ============ Giai đoạn 3: Tinh chỉnh ============
         self.report_progress(
             self.gwo_iterations + 1,
             self._calculate_plan_cost(plan),
@@ -114,10 +114,10 @@ class HybridGBFSGWO(BaseAlgorithm):
 
         plan = self._refine_plan(plan, flow_matrix, zones, shelters)
 
-        # ============ Finalize ============
+        # ============ Hoàn thiện ============
         self._stop_timer(start_time)
 
-        # Calculate final metrics
+        # Tính toán các chỉ số cuối cùng
         self._metrics.iterations = (
             self.gwo_iterations + len(zones) + self.refinement_iterations
         )
@@ -125,7 +125,7 @@ class HybridGBFSGWO(BaseAlgorithm):
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
 
-        # Coverage rate: evacuees covered / min(total_population, total_capacity)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
         total_population = sum(z.population for z in zones)
         total_capacity = sum(s.capacity for s in shelters)
         max_possible = min(total_population, total_capacity)
@@ -145,53 +145,53 @@ class HybridGBFSGWO(BaseAlgorithm):
                                  zones: List[PopulationZone],
                                  shelters: List[Shelter]) -> EvacuationPlan:
         """
-        Apply GBFS pathfinding to GWO flow assignments.
+        Áp dụng tìm đường GBFS cho các phân công luồng GWO.
 
         Args:
-            flow_matrix: GWO-optimized flow distribution [n_zones x n_shelters]
-            zones: List of population zones
-            shelters: List of shelters
+            flow_matrix: Phân phối luồng được tối ưu hóa bởi GWO [n_zones x n_shelters]
+            zones: Danh sách các khu vực dân cư
+            shelters: Danh sách các nơi trú ẩn
 
         Returns:
-            EvacuationPlan with actual paths
+            EvacuationPlan với các đường đi thực tế
         """
         plan = EvacuationPlan(algorithm_type=AlgorithmType.HYBRID)
 
         populations = np.array([z.population for z in zones])
         capacities = np.array([s.capacity for s in shelters])
 
-        # Calculate actual flows
+        # Tính toán luồng thực tế
         flows = flow_matrix * populations[:, np.newaxis]
 
-        # Track shelter occupancy
+        # Theo dõi mức độ sử dụng nơi trú ẩn
         shelter_occupancy = {s.id: 0 for s in shelters}
 
-        # Process each zone
+        # Xử lý từng khu vực
         for i, zone in enumerate(zones):
             if self._should_stop:
                 break
 
-            # Get shelters this zone should send people to
+            # Lấy các nơi trú ẩn mà khu vực này nên gửi người đến
             zone_flows = [(j, int(flows[i, j])) for j in range(len(shelters))]
             zone_flows = [(j, f) for j, f in zone_flows
                          if f >= self.config.min_flow_threshold]
-            zone_flows.sort(key=lambda x: -x[1])  # Sort by flow descending
+            zone_flows.sort(key=lambda x: -x[1])  # Sắp xếp theo luồng giảm dần
 
             for j, target_flow in zone_flows:
                 shelter = shelters[j]
 
-                # Check available capacity
+                # Kiểm tra sức chứa khả dụng
                 available = shelter.capacity - shelter_occupancy[shelter.id]
                 actual_flow = min(target_flow, int(available))
 
                 if actual_flow < self.config.min_flow_threshold:
                     continue
 
-                # Find path using GBFS
+                # Tìm đường đi sử dụng GBFS
                 path, found_shelter, cost = self.gbfs.find_path(zone, [shelter])
 
                 if path and found_shelter:
-                    # Calculate route metrics
+                    # Tính toán các chỉ số tuyến đường
                     distance = self.gbfs._calculate_path_distance(path)
                     time_hours = self.gbfs._calculate_path_time(path)
                     risk = self.gbfs._calculate_path_risk(path)
@@ -208,7 +208,7 @@ class HybridGBFSGWO(BaseAlgorithm):
                     plan.add_route(route)
                     shelter_occupancy[shelter.id] += actual_flow
 
-            # Report progress
+            # Báo cáo tiến trình
             iteration = self.gwo_iterations + i + 1
             self._metrics.convergence_history.append(self._calculate_plan_cost(plan))
             self.report_progress(iteration, self._calculate_plan_cost(plan),
@@ -222,21 +222,21 @@ class HybridGBFSGWO(BaseAlgorithm):
                      zones: List[PopulationZone],
                      shelters: List[Shelter]) -> EvacuationPlan:
         """
-        Refine the evacuation plan by redistributing flows based on actual path costs.
+        Tinh chỉnh kế hoạch sơ tán bằng cách phân phối lại luồng dựa trên chi phí đường đi thực tế.
 
         Args:
-            plan: Current evacuation plan
-            flow_matrix: Original flow matrix
-            zones: Population zones
-            shelters: Shelters
+            plan: Kế hoạch sơ tán hiện tại
+            flow_matrix: Ma trận luồng ban đầu
+            zones: Các khu vực dân cư
+            shelters: Các nơi trú ẩn
 
         Returns:
-            Refined EvacuationPlan
+            EvacuationPlan đã được tinh chỉnh
         """
         if not plan.routes:
             return plan
 
-        # Build cost matrix from actual paths
+        # Xây dựng ma trận chi phí từ các đường đi thực tế
         cost_matrix = np.full((len(zones), len(shelters)), float('inf'))
         zone_to_idx = {z.id: i for i, z in enumerate(zones)}
         shelter_to_idx = {s.id: j for j, s in enumerate(shelters)}
@@ -245,10 +245,10 @@ class HybridGBFSGWO(BaseAlgorithm):
             i = zone_to_idx.get(route.zone_id)
             j = shelter_to_idx.get(route.shelter_id)
             if i is not None and j is not None:
-                # Cost = time + risk penalty
+                # Chi phí = thời gian + phạt rủi ro
                 cost_matrix[i, j] = route.estimated_time_hours + 0.5 * route.risk_score
 
-        # Refinement iterations
+        # Các vòng lặp tinh chỉnh
         current_plan = plan
         best_cost = self._calculate_plan_cost(current_plan)
 
@@ -256,7 +256,7 @@ class HybridGBFSGWO(BaseAlgorithm):
             if self._should_stop:
                 break
 
-            # Try to improve by redistributing from high-cost to low-cost routes
+            # Thử cải thiện bằng cách phân phối lại từ tuyến đường chi phí cao sang thấp
             improved_plan = self._try_redistribution(current_plan, cost_matrix,
                                                       zones, shelters)
 
@@ -266,7 +266,7 @@ class HybridGBFSGWO(BaseAlgorithm):
                 current_plan = improved_plan
                 best_cost = new_cost
 
-            # Report progress
+            # Báo cáo tiến trình
             iteration = self.gwo_iterations + len(zones) + ref_iter + 1
             self._metrics.convergence_history.append(best_cost)
             self.report_progress(iteration, best_cost, {'phase': 'refinement', 'iter': ref_iter})
@@ -279,26 +279,26 @@ class HybridGBFSGWO(BaseAlgorithm):
                             zones: List[PopulationZone],
                             shelters: List[Shelter]) -> EvacuationPlan:
         """
-        Try to redistribute flows to improve overall cost.
+        Thử phân phối lại luồng để cải thiện chi phí tổng thể.
 
         Args:
-            plan: Current plan
-            cost_matrix: Path cost matrix
-            zones: Zones
-            shelters: Shelters
+            plan: Kế hoạch hiện tại
+            cost_matrix: Ma trận chi phí đường đi
+            zones: Các khu vực
+            shelters: Các nơi trú ẩn
 
         Returns:
-            Potentially improved plan
+            Kế hoạch có khả năng được cải thiện
         """
-        # Find high-cost routes that might benefit from redistribution
+        # Tìm các tuyến đường chi phí cao có thể được hưởng lợi từ phân phối lại
         if not plan.routes:
             return plan
 
-        # Calculate mean cost
+        # Tính chi phí trung bình
         route_costs = [r.estimated_time_hours + 0.5 * r.risk_score for r in plan.routes]
         mean_cost = np.mean(route_costs) if route_costs else 0
 
-        # Find routes above mean cost
+        # Tìm các tuyến đường trên chi phí trung bình
         high_cost_routes = [
             (i, r) for i, r in enumerate(plan.routes)
             if r.estimated_time_hours + 0.5 * r.risk_score > mean_cost
@@ -307,7 +307,7 @@ class HybridGBFSGWO(BaseAlgorithm):
         if not high_cost_routes:
             return plan
 
-        # Try to find better alternatives for high-cost routes
+        # Thử tìm các phương án tốt hơn cho các tuyến đường chi phí cao
         new_routes = list(plan.routes)
         shelter_loads = plan.get_shelter_loads()
 
@@ -323,7 +323,7 @@ class HybridGBFSGWO(BaseAlgorithm):
             current_shelter_idx = shelter_to_idx.get(route.shelter_id)
             current_cost = cost_matrix[zone_idx, current_shelter_idx] if current_shelter_idx else float('inf')
 
-            # Find alternative shelters with lower cost and available capacity
+            # Tìm các nơi trú ẩn thay thế với chi phí thấp hơn và sức chứa khả dụng
             for j, shelter in enumerate(shelters_list):
                 if shelter.id == route.shelter_id:
                     continue
@@ -332,17 +332,17 @@ class HybridGBFSGWO(BaseAlgorithm):
                 if alt_cost >= current_cost or alt_cost == float('inf'):
                     continue
 
-                # Check capacity
+                # Kiểm tra sức chứa
                 current_load = shelter_loads.get(shelter.id, 0)
                 if current_load + route.flow > shelter.capacity:
                     continue
 
-                # Found a better alternative - find new path
+                # Tìm thấy một phương án tốt hơn - tìm đường đi mới
                 zone = zones[zone_idx]
                 path, found_shelter, _ = self.gbfs.find_path(zone, [shelter])
 
                 if path and found_shelter:
-                    # Update route
+                    # Cập nhật tuyến đường
                     new_route = EvacuationRoute(
                         zone_id=route.zone_id,
                         shelter_id=shelter.id,
@@ -354,13 +354,13 @@ class HybridGBFSGWO(BaseAlgorithm):
                     )
                     new_routes[route_idx] = new_route
 
-                    # Update shelter loads
+                    # Cập nhật tải của nơi trú ẩn
                     shelter_loads[route.shelter_id] = shelter_loads.get(route.shelter_id, 0) - route.flow
                     shelter_loads[shelter.id] = shelter_loads.get(shelter.id, 0) + route.flow
 
-                    break  # Move to next high-cost route
+                    break  # Chuyển sang tuyến đường chi phí cao tiếp theo
 
-        # Create new plan
+        # Tạo kế hoạch mới
         improved_plan = EvacuationPlan(algorithm_type=AlgorithmType.HYBRID)
         for route in new_routes:
             improved_plan.add_route(route)
@@ -369,31 +369,31 @@ class HybridGBFSGWO(BaseAlgorithm):
 
     def _calculate_plan_cost(self, plan: EvacuationPlan) -> float:
         """
-        Calculate total cost of an evacuation plan.
+        Tính tổng chi phí của một kế hoạch sơ tán.
 
         Args:
-            plan: The evacuation plan
+            plan: Kế hoạch sơ tán
 
         Returns:
-            Total cost value
+            Giá trị tổng chi phí
         """
         if not plan.routes:
             return float('inf')
 
         total_cost = 0.0
         for route in plan.routes:
-            # Weighted sum of time and risk
+            # Tổng có trọng số của thời gian và rủi ro
             route_cost = route.flow * (
                 route.estimated_time_hours +
                 0.3 * route.risk_score +
-                0.001 * route.distance_km  # Small distance penalty
+                0.001 * route.distance_km  # Phạt khoảng cách nhỏ
             )
             total_cost += route_cost
 
         return total_cost
 
     def get_component_metrics(self) -> Dict[str, AlgorithmMetrics]:
-        """Get metrics from individual algorithm components."""
+        """Lấy các chỉ số từ các thành phần thuật toán riêng lẻ."""
         return {
             'gwo': self.gwo.metrics,
             'gbfs': self.gbfs.metrics

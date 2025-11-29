@@ -1,6 +1,6 @@
 """
-Ho Chi Minh City data: Districts, population, and flood-prone areas.
-This provides realistic data for the evacuation simulation.
+Dữ liệu Thành phố Hồ Chí Minh: Quận, dân số và khu vực ngập lụt.
+Cung cấp dữ liệu thực tế cho mô phỏng sơ tán.
 """
 
 from typing import Dict, List, Tuple
@@ -9,18 +9,18 @@ from dataclasses import dataclass
 
 @dataclass
 class DistrictData:
-    """Data for a HCM district."""
+    """Dữ liệu cho một quận ở TP.HCM."""
     name: str
-    name_vi: str  # Vietnamese name
+    name_vi: str  # Tên tiếng Việt
     center_lat: float
     center_lon: float
     population: int
     area_km2: float
-    flood_risk: float  # 0.0 to 1.0, historical flood risk
+    flood_risk: float  # 0.0 đến 1.0, rủi ro ngập lụt lịch sử
 
 
-# Ho Chi Minh City Districts with approximate 2023 data
-# Population data is approximate based on available statistics
+# Các quận Thành phố Hồ Chí Minh với dữ liệu ước tính năm 2023
+# Dữ liệu dân số là ước tính dựa trên thống kê có sẵn
 HCM_DISTRICTS: Dict[str, DistrictData] = {
     'district_1': DistrictData(
         name='District 1', name_vi='Quan 1',
@@ -35,7 +35,7 @@ HCM_DISTRICTS: Dict[str, DistrictData] = {
     'district_4': DistrictData(
         name='District 4', name_vi='Quan 4',
         center_lat=10.7579, center_lon=106.7057,
-        population=180000, area_km2=4.18, flood_risk=0.8  # Low-lying area
+        population=180000, area_km2=4.18, flood_risk=0.8  # Vùng trũng thấp
     ),
     'district_5': DistrictData(
         name='District 5', name_vi='Quan 5',
@@ -50,12 +50,12 @@ HCM_DISTRICTS: Dict[str, DistrictData] = {
     'district_7': DistrictData(
         name='District 7', name_vi='Quan 7',
         center_lat=10.7365, center_lon=106.7218,
-        population=310000, area_km2=35.69, flood_risk=0.7  # Phu My Hung area
+        population=310000, area_km2=35.69, flood_risk=0.7  # Khu vực Phú Mỹ Hưng
     ),
     'district_8': DistrictData(
         name='District 8', name_vi='Quan 8',
         center_lat=10.7255, center_lon=106.6373,
-        population=430000, area_km2=19.18, flood_risk=0.9  # Very flood-prone
+        population=430000, area_km2=19.18, flood_risk=0.9  # Rất dễ ngập lụt
     ),
     'district_10': DistrictData(
         name='District 10', name_vi='Quan 10',
@@ -110,19 +110,19 @@ HCM_DISTRICTS: Dict[str, DistrictData] = {
     'nha_be': DistrictData(
         name='Nha Be', name_vi='Nha Be',
         center_lat=10.6947, center_lon=106.7378,
-        population=180000, area_km2=100.41, flood_risk=0.9  # Coastal, very flood-prone
+        population=180000, area_km2=100.41, flood_risk=0.9  # Ven biển, rất dễ ngập lụt
     ),
     'can_gio': DistrictData(
         name='Can Gio', name_vi='Can Gio',
         center_lat=10.4114, center_lon=106.9533,
-        population=75000, area_km2=704.22, flood_risk=0.95  # Coastal mangrove area
+        population=75000, area_km2=704.22, flood_risk=0.95  # Khu vực rừng ngập mặn ven biển
     ),
 }
 
 
 @dataclass
 class ShelterTemplate:
-    """Template for generating shelters."""
+    """Mẫu để tạo các điểm trú ẩn."""
     name: str
     lat: float
     lon: float
@@ -131,10 +131,10 @@ class ShelterTemplate:
     district: str
 
 
-# Major shelters in Ho Chi Minh City
-# These are real locations that could serve as evacuation shelters
+# Các điểm trú ẩn chính ở Thành phố Hồ Chí Minh
+# Đây là các địa điểm thực tế có thể phục vụ như điểm sơ tán
 HCM_SHELTERS: List[ShelterTemplate] = [
-    # Stadiums
+    # Sân vận động
     ShelterTemplate(
         name='Thong Nhat Stadium',
         lat=10.7888, lon=106.6875,
@@ -151,7 +151,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=8000, shelter_type='stadium', district='thu_duc'
     ),
 
-    # Universities (large capacity)
+    # Đại học (sức chứa lớn)
     ShelterTemplate(
         name='HCMC University of Technology',
         lat=10.7725, lon=106.6576,
@@ -178,7 +178,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=8000, shelter_type='university', district='thu_duc'
     ),
 
-    # Hospitals (limited capacity but essential)
+    # Bệnh viện (sức chứa hạn chế nhưng thiết yếu)
     ShelterTemplate(
         name='Cho Ray Hospital',
         lat=10.7546, lon=106.6621,
@@ -195,7 +195,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=600, shelter_type='hospital', district='thu_duc'
     ),
 
-    # Community Centers & Convention Centers
+    # Trung tâm Cộng đồng & Trung tâm Hội nghị
     ShelterTemplate(
         name='Saigon Exhibition Center (SECC)',
         lat=10.7445, lon=106.7260,
@@ -212,7 +212,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=3000, shelter_type='convention', district='district_1'
     ),
 
-    # Schools (distributed across districts)
+    # Trường học (phân bổ khắp các quận)
     ShelterTemplate(
         name='Le Hong Phong High School',
         lat=10.7815, lon=106.6885,
@@ -244,7 +244,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=1500, shelter_type='school', district='thu_duc'
     ),
 
-    # Religious buildings (community gathering points)
+    # Công trình tôn giáo (điểm tụ tập cộng đồng)
     ShelterTemplate(
         name='Notre-Dame Cathedral',
         lat=10.7798, lon=106.6990,
@@ -256,7 +256,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
         capacity=800, shelter_type='religious', district='district_3'
     ),
 
-    # Shopping Malls (large enclosed spaces)
+    # Trung tâm thương mại (không gian lớn có mái che)
     ShelterTemplate(
         name='AEON Mall Binh Tan',
         lat=10.7483, lon=106.6078,
@@ -275,36 +275,36 @@ HCM_SHELTERS: List[ShelterTemplate] = [
 ]
 
 
-# Known flood-prone areas in HCM City
-# These are based on historical flooding data
+# Các khu vực dễ ngập lụt đã biết ở TP.HCM
+# Dựa trên dữ liệu ngập lụt lịch sử
 FLOOD_PRONE_AREAS: List[Dict] = [
-    # District 8 - Most flood-prone
+    # Quận 8 - Dễ ngập lụt nhất
     {'center_lat': 10.7255, 'center_lon': 106.6373, 'radius_km': 2.5, 'risk': 0.9, 'name': 'District 8 Central'},
 
-    # Nha Be - Coastal flooding
+    # Nhà Bè - Ngập lụt ven biển
     {'center_lat': 10.6947, 'center_lon': 106.7378, 'radius_km': 3.0, 'risk': 0.85, 'name': 'Nha Be'},
 
-    # District 7 - Phu My Hung area
+    # Quận 7 - Khu vực Phú Mỹ Hưng
     {'center_lat': 10.7285, 'center_lon': 106.7158, 'radius_km': 2.0, 'risk': 0.75, 'name': 'Phu My Hung'},
 
-    # District 4 - Low-lying
+    # Quận 4 - Vùng trũng thấp
     {'center_lat': 10.7579, 'center_lon': 106.7057, 'radius_km': 1.5, 'risk': 0.8, 'name': 'District 4'},
 
-    # Binh Thanh - Near Saigon River
+    # Bình Thạnh - Gần sông Sài Gòn
     {'center_lat': 10.8021, 'center_lon': 106.7212, 'radius_km': 1.5, 'risk': 0.6, 'name': 'Binh Thanh Riverside'},
 
-    # Thu Duc - Certain areas
+    # Thủ Đức - Một số khu vực
     {'center_lat': 10.8614, 'center_lon': 106.7689, 'radius_km': 1.8, 'risk': 0.5, 'name': 'Thu Duc Low Areas'},
 
-    # District 6 - Channel areas
+    # Quận 6 - Khu vực kênh rạch
     {'center_lat': 10.7428, 'center_lon': 106.6283, 'radius_km': 1.2, 'risk': 0.65, 'name': 'District 6 Canal'},
 
-    # Binh Tan - Industrial area drainage
+    # Bình Tân - Thoát nước khu công nghiệp
     {'center_lat': 10.7504, 'center_lon': 106.5937, 'radius_km': 2.0, 'risk': 0.55, 'name': 'Binh Tan Industrial'},
 ]
 
 
-# Ho Chi Minh City geographic bounds
+# Ranh giới địa lý Thành phố Hồ Chí Minh
 HCM_BOUNDS = {
     'north': 10.9000,
     'south': 10.6500,
@@ -316,22 +316,22 @@ HCM_BOUNDS = {
 
 
 def get_total_population() -> int:
-    """Get total population of all districts."""
+    """Lấy tổng dân số của tất cả các quận."""
     return sum(d.population for d in HCM_DISTRICTS.values())
 
 
 def get_total_shelter_capacity() -> int:
-    """Get total capacity of all shelters."""
+    """Lấy tổng sức chứa của tất cả các điểm trú ẩn."""
     return sum(s.capacity for s in HCM_SHELTERS)
 
 
 def get_districts_by_flood_risk(min_risk: float = 0.5) -> List[DistrictData]:
-    """Get districts with flood risk above threshold."""
+    """Lấy các quận có rủi ro ngập lụt trên ngưỡng."""
     return [d for d in HCM_DISTRICTS.values() if d.flood_risk >= min_risk]
 
 
 def get_shelter_capacity_by_type() -> Dict[str, int]:
-    """Get total shelter capacity grouped by type."""
+    """Lấy tổng sức chứa điểm trú ẩn được nhóm theo loại."""
     capacity_by_type: Dict[str, int] = {}
     for shelter in HCM_SHELTERS:
         if shelter.shelter_type not in capacity_by_type:
@@ -340,19 +340,19 @@ def get_shelter_capacity_by_type() -> Dict[str, int]:
     return capacity_by_type
 
 
-# Print summary when module is run directly
+# In tóm tắt khi module được chạy trực tiếp
 if __name__ == '__main__':
-    print("Ho Chi Minh City Evacuation Data Summary")
+    print("Tóm tắt Dữ liệu Sơ tán Thành phố Hồ Chí Minh")
     print("=" * 50)
-    print(f"Total Districts: {len(HCM_DISTRICTS)}")
-    print(f"Total Population: {get_total_population():,}")
-    print(f"Total Shelters: {len(HCM_SHELTERS)}")
-    print(f"Total Shelter Capacity: {get_total_shelter_capacity():,}")
+    print(f"Tổng số Quận: {len(HCM_DISTRICTS)}")
+    print(f"Tổng Dân số: {get_total_population():,}")
+    print(f"Tổng số Điểm trú ẩn: {len(HCM_SHELTERS)}")
+    print(f"Tổng Sức chứa Điểm trú ẩn: {get_total_shelter_capacity():,}")
     print()
-    print("Shelter Capacity by Type:")
+    print("Sức chứa Điểm trú ẩn theo Loại:")
     for stype, cap in get_shelter_capacity_by_type().items():
         print(f"  {stype}: {cap:,}")
     print()
-    print("High-Risk Districts (>50% flood risk):")
+    print("Các Quận Rủi ro Cao (>50% rủi ro ngập lụt):")
     for d in get_districts_by_flood_risk(0.5):
-        print(f"  {d.name}: {d.flood_risk:.0%} risk, pop {d.population:,}")
+        print(f"  {d.name}: {d.flood_risk:.0%} rủi ro, dân số {d.population:,}")

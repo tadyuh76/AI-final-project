@@ -1,5 +1,5 @@
 """
-Models package for the evacuation network.
+Gói mô hình cho mạng lưới sơ tán.
 """
 
 from .node import (

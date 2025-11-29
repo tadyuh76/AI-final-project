@@ -1,7 +1,7 @@
 """
-OpenStreetMap data loader for Ho Chi Minh City.
-Downloads and processes real road network data using OSMnx.
-Falls back to generated data if OSMnx is not available.
+Bộ tải dữ liệu OpenStreetMap cho Thành phố Hồ Chí Minh.
+Tải xuống và xử lý dữ liệu mạng lưới đường thực tế sử dụng OSMnx.
+Dự phòng dữ liệu được tạo nếu OSMnx không khả dụng.
 """
 
 import os
@@ -18,7 +18,7 @@ from .hcm_data import (
     DistrictData, ShelterTemplate
 )
 
-# Try to import OSMnx
+# Thử import OSMnx
 try:
     import osmnx as ox
     HAS_OSMNX = True
@@ -35,17 +35,17 @@ except ImportError:
 
 
 class OSMDataLoader:
-    """Loads road network data from OpenStreetMap."""
+    """Tải dữ liệu mạng lưới đường từ OpenStreetMap."""
 
     def __init__(self, cache_dir: Optional[str] = None):
         """
-        Initialize the loader.
+        Khởi tạo bộ tải.
 
         Args:
-            cache_dir: Directory to cache downloaded data. Defaults to assets/data/
+            cache_dir: Thư mục để lưu trữ dữ liệu đã tải xuống. Mặc định là assets/data/
         """
         if cache_dir is None:
-            # Default to project's assets/data directory
+            # Mặc định vào thư mục assets/data của dự án
             self.cache_dir = Path(__file__).parent.parent.parent / 'assets' / 'data'
         else:
             self.cache_dir = Path(cache_dir)
@@ -57,63 +57,63 @@ class OSMDataLoader:
                          simplify: bool = True,
                          network_type: str = 'drive') -> EvacuationNetwork:
         """
-        Load Ho Chi Minh City road network.
+        Tải mạng lưới đường Thành phố Hồ Chí Minh.
 
         Args:
-            use_cache: Whether to use cached data if available
-            simplify: Whether to simplify the graph (merge intermediate nodes)
-            network_type: OSMnx network type ('drive', 'walk', 'all')
+            use_cache: Có sử dụng dữ liệu đã lưu nếu có không
+            simplify: Có đơn giản hóa đồ thị không (gộp các nút trung gian)
+            network_type: Loại mạng OSMnx ('drive', 'walk', 'all')
 
         Returns:
-            EvacuationNetwork with HCM road data
+            EvacuationNetwork với dữ liệu đường TP.HCM
         """
         cache_file = self.cache_dir / 'hcm_network.json'
 
-        # Try to load from cache
+        # Thử tải từ bộ nhớ đệm
         if use_cache and cache_file.exists():
             try:
-                print("Loading cached HCM network...")
+                print("Đang tải mạng lưới TP.HCM đã lưu...")
                 return EvacuationNetwork.load_from_file(str(cache_file))
             except Exception as e:
-                print(f"Failed to load cache: {e}")
+                print(f"Không thể tải bộ nhớ đệm: {e}")
 
-        # Try to download from OSM
+        # Thử tải xuống từ OSM
         if HAS_OSMNX:
             try:
-                print("Downloading HCM road network from OpenStreetMap...")
+                print("Đang tải xuống mạng lưới đường TP.HCM từ OpenStreetMap...")
                 network = self._download_osm_network(simplify, network_type)
 
-                # Save to cache
+                # Lưu vào bộ nhớ đệm
                 if use_cache:
-                    print("Saving to cache...")
+                    print("Đang lưu vào bộ nhớ đệm...")
                     network.save_to_file(str(cache_file))
 
                 return network
             except Exception as e:
-                print(f"Failed to download OSM data: {e}")
-                print("Falling back to generated network...")
+                print(f"Không thể tải xuống dữ liệu OSM: {e}")
+                print("Đang chuyển sang mạng lưới được tạo...")
 
-        # Fall back to generated network
-        print("Generating synthetic HCM network...")
+        # Dự phòng mạng lưới được tạo
+        print("Đang tạo mạng lưới TP.HCM tổng hợp...")
         network = self._generate_synthetic_network()
 
-        # Save to cache
+        # Lưu vào bộ nhớ đệm
         if use_cache:
             network.save_to_file(str(cache_file))
 
         return network
 
     def _download_osm_network(self, simplify: bool, network_type: str) -> EvacuationNetwork:
-        """Download road network from OpenStreetMap using OSMnx."""
+        """Tải xuống mạng lưới đường từ OpenStreetMap sử dụng OSMnx."""
         if not HAS_OSMNX:
-            raise RuntimeError("OSMnx is not installed")
+            raise RuntimeError("OSMnx chưa được cài đặt")
 
-        # Configure OSMnx
+        # Cấu hình OSMnx
         ox.settings.use_cache = True
         ox.settings.log_console = True
 
-        # Download the graph
-        print(f"  Downloading {network_type} network for HCM bounds...")
+        # Tải xuống đồ thị
+        print(f"  Đang tải xuống mạng lưới {network_type} cho ranh giới TP.HCM...")
         G = ox.graph_from_bbox(
             bbox=(HCM_BOUNDS['north'], HCM_BOUNDS['south'],
                   HCM_BOUNDS['east'], HCM_BOUNDS['west']),
@@ -121,24 +121,24 @@ class OSMDataLoader:
             simplify=simplify
         )
 
-        print(f"  Downloaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+        print(f"  Đã tải xuống: {G.number_of_nodes()} nút, {G.number_of_edges()} cạnh")
 
-        # Convert to EvacuationNetwork
+        # Chuyển đổi sang EvacuationNetwork
         network = self._convert_osmnx_graph(G)
 
-        # Add population zones
+        # Thêm các khu vực dân cư
         self._add_population_zones(network)
 
-        # Add shelters
+        # Thêm điểm trú ẩn
         self._add_shelters(network)
 
         return network
 
     def _convert_osmnx_graph(self, G) -> EvacuationNetwork:
-        """Convert OSMnx graph to EvacuationNetwork."""
+        """Chuyển đổi đồ thị OSMnx sang EvacuationNetwork."""
         network = EvacuationNetwork()
 
-        # Add nodes
+        # Thêm các nút
         for node_id, data in G.nodes(data=True):
             node = Node(
                 id=str(node_id),
@@ -148,7 +148,7 @@ class OSMDataLoader:
             )
             network.add_node(node)
 
-        # Add edges
+        # Thêm các cạnh
         edge_count = 0
         for u, v, key, data in G.edges(keys=True, data=True):
             edge_id = f"e_{u}_{v}_{key}"
@@ -156,19 +156,19 @@ class OSMDataLoader:
             network.add_edge(edge)
             edge_count += 1
 
-        print(f"  Converted: {len(network._nodes)} nodes, {edge_count} edges")
+        print(f"  Đã chuyển đổi: {len(network._nodes)} nút, {edge_count} cạnh")
         return network
 
     def _generate_synthetic_network(self) -> EvacuationNetwork:
-        """Generate a synthetic road network for HCM."""
+        """Tạo một mạng lưới đường tổng hợp cho TP.HCM."""
         network = EvacuationNetwork()
 
-        # Create a grid-like network covering HCM
-        grid_size = 20  # 20x20 grid
+        # Tạo một mạng lưới dạng lưới bao phủ TP.HCM
+        grid_size = 20  # Lưới 20x20
         lat_step = (HCM_BOUNDS['north'] - HCM_BOUNDS['south']) / grid_size
         lon_step = (HCM_BOUNDS['east'] - HCM_BOUNDS['west']) / grid_size
 
-        # Create grid nodes
+        # Tạo các nút lưới
         node_grid = {}
         for i in range(grid_size + 1):
             for j in range(grid_size + 1):
@@ -185,13 +185,13 @@ class OSMDataLoader:
                 network.add_node(node)
                 node_grid[(i, j)] = node_id
 
-        # Create grid edges (roads)
+        # Tạo các cạnh lưới (đường)
         edge_count = 0
         for i in range(grid_size + 1):
             for j in range(grid_size + 1):
                 current = node_grid[(i, j)]
 
-                # Connect to right neighbor
+                # Kết nối với nút bên phải
                 if j < grid_size:
                     neighbor = node_grid[(i, j + 1)]
                     edge = self._create_grid_edge(
@@ -204,7 +204,7 @@ class OSMDataLoader:
                     network.add_edge(edge)
                     edge_count += 1
 
-                # Connect to top neighbor
+                # Kết nối với nút phía trên
                 if i < grid_size:
                     neighbor = node_grid[(i + 1, j)]
                     edge = self._create_grid_edge(
@@ -217,7 +217,7 @@ class OSMDataLoader:
                     network.add_edge(edge)
                     edge_count += 1
 
-        # Add diagonal connections for major roads
+        # Thêm kết nối chéo cho các đường chính
         for i in range(0, grid_size, 5):
             for j in range(0, grid_size, 5):
                 current = node_grid[(i, j)]
@@ -233,19 +233,19 @@ class OSMDataLoader:
                     network.add_edge(edge)
                     edge_count += 1
 
-        print(f"  Generated: {len(network._nodes)} nodes, {edge_count} edges")
+        print(f"  Đã tạo: {len(network._nodes)} nút, {edge_count} cạnh")
 
-        # Add population zones
+        # Thêm các khu vực dân cư
         self._add_population_zones(network)
 
-        # Add shelters
+        # Thêm điểm trú ẩn
         self._add_shelters(network)
 
         return network
 
     def _create_grid_edge(self, edge_id: str, source_id: str, target_id: str,
                           source: Node, target: Node, is_major: bool) -> Edge:
-        """Create a grid edge with appropriate properties."""
+        """Tạo một cạnh lưới với các thuộc tính phù hợp."""
         from ..models.node import haversine_distance
 
         length = haversine_distance(source.lat, source.lon, target.lat, target.lon)
@@ -272,13 +272,13 @@ class OSMDataLoader:
         )
 
     def _add_population_zones(self, network: EvacuationNetwork) -> None:
-        """Add population zones from HCM district data."""
+        """Thêm các khu vực dân cư từ dữ liệu quận TP.HCM."""
         for district_id, district in HCM_DISTRICTS.items():
-            # Find nearest network node to district center
+            # Tìm nút mạng gần nhất với trung tâm quận
             nearest = network.find_nearest_node(district.center_lat, district.center_lon)
 
             if nearest:
-                # Create population zone at district center
+                # Tạo khu vực dân cư tại trung tâm quận
                 zone = PopulationZone(
                     id=f"zone_{district_id}",
                     lat=district.center_lat,
@@ -289,7 +289,7 @@ class OSMDataLoader:
                 )
                 network.add_node(zone)
 
-                # Connect to nearest intersection
+                # Kết nối với giao lộ gần nhất
                 from ..models.node import haversine_distance
                 length = haversine_distance(zone.lat, zone.lon, nearest.lat, nearest.lon)
                 edge = Edge(
@@ -304,12 +304,12 @@ class OSMDataLoader:
                 )
                 network.add_edge(edge)
 
-        print(f"  Added {len(HCM_DISTRICTS)} population zones")
+        print(f"  Đã thêm {len(HCM_DISTRICTS)} khu vực dân cư")
 
     def _add_shelters(self, network: EvacuationNetwork) -> None:
-        """Add shelters from HCM shelter data."""
+        """Thêm điểm trú ẩn từ dữ liệu điểm trú ẩn TP.HCM."""
         for i, shelter_data in enumerate(HCM_SHELTERS):
-            # Find nearest network node
+            # Tìm nút mạng gần nhất
             nearest = network.find_nearest_node(shelter_data.lat, shelter_data.lon)
 
             if nearest:
@@ -323,7 +323,7 @@ class OSMDataLoader:
                 )
                 network.add_node(shelter)
 
-                # Connect to nearest intersection
+                # Kết nối với giao lộ gần nhất
                 from ..models.node import haversine_distance
                 length = haversine_distance(shelter.lat, shelter.lon, nearest.lat, nearest.lon)
                 edge = Edge(
@@ -338,16 +338,16 @@ class OSMDataLoader:
                 )
                 network.add_edge(edge)
 
-        print(f"  Added {len(HCM_SHELTERS)} shelters")
+        print(f"  Đã thêm {len(HCM_SHELTERS)} điểm trú ẩn")
 
     def add_default_hazards(self, network: EvacuationNetwork,
                            typhoon_intensity: float = 0.7) -> None:
         """
-        Add default flood hazard zones based on historical data.
+        Thêm các khu vực nguy hiểm ngập lụt mặc định dựa trên dữ liệu lịch sử.
 
         Args:
-            network: The network to add hazards to
-            typhoon_intensity: Multiplier for risk levels (0.0 to 1.0)
+            network: Mạng lưới để thêm nguy hiểm vào
+            typhoon_intensity: Hệ số nhân cho mức độ rủi ro (0.0 đến 1.0)
         """
         for area in FLOOD_PRONE_AREAS:
             hazard = HazardZone(
@@ -359,32 +359,32 @@ class OSMDataLoader:
             )
             network.add_hazard_zone(hazard)
 
-        print(f"  Added {len(FLOOD_PRONE_AREAS)} hazard zones")
+        print(f"  Đã thêm {len(FLOOD_PRONE_AREAS)} khu vực nguy hiểm")
 
 
 def load_network(use_cache: bool = True,
                 use_osm: bool = True) -> EvacuationNetwork:
     """
-    Convenience function to load HCM network.
+    Hàm tiện ích để tải mạng lưới TP.HCM.
 
     Args:
-        use_cache: Whether to use cached data
-        use_osm: Whether to try downloading from OSM
+        use_cache: Có sử dụng dữ liệu đã lưu không
+        use_osm: Có thử tải xuống từ OSM không
 
     Returns:
-        Loaded EvacuationNetwork
+        EvacuationNetwork đã tải
     """
     loader = OSMDataLoader()
     network = loader.load_hcm_network(use_cache=use_cache)
     return network
 
 
-# Test the loader
+# Kiểm tra bộ tải
 if __name__ == '__main__':
-    print("Testing OSM Data Loader")
+    print("Đang kiểm tra Bộ tải Dữ liệu OSM")
     print("=" * 50)
-    print(f"OSMnx available: {HAS_OSMNX}")
-    print(f"NetworkX available: {HAS_NETWORKX}")
+    print(f"OSMnx khả dụng: {HAS_OSMNX}")
+    print(f"NetworkX khả dụng: {HAS_NETWORKX}")
     print()
 
     loader = OSMDataLoader()
@@ -392,12 +392,12 @@ if __name__ == '__main__':
     loader.add_default_hazards(network, typhoon_intensity=0.7)
 
     print()
-    print("Network Statistics:")
+    print("Thống kê Mạng lưới:")
     stats = network.get_stats()
-    print(f"  Nodes: {stats.total_nodes}")
-    print(f"  Edges: {stats.total_edges}")
-    print(f"  Population Zones: {stats.population_zones}")
-    print(f"  Shelters: {stats.shelters}")
-    print(f"  Total Population: {stats.total_population:,}")
-    print(f"  Total Shelter Capacity: {stats.total_shelter_capacity:,}")
-    print(f"  Hazard Zones: {len(network.get_hazard_zones())}")
+    print(f"  Nút: {stats.total_nodes}")
+    print(f"  Cạnh: {stats.total_edges}")
+    print(f"  Khu vực Dân cư: {stats.population_zones}")
+    print(f"  Điểm trú ẩn: {stats.shelters}")
+    print(f"  Tổng Dân số: {stats.total_population:,}")
+    print(f"  Tổng Sức chứa Điểm trú ẩn: {stats.total_shelter_capacity:,}")
+    print(f"  Khu vực Nguy hiểm: {len(network.get_hazard_zones())}")

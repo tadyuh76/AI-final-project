@@ -1,14 +1,14 @@
 """
-Grey Wolf Optimizer (GWO) Algorithm for evacuation flow distribution.
+Thuật toán Tối ưu hóa Bầy Sói Xám (GWO) cho phân phối luồng sơ tán.
 
-GWO is a metaheuristic inspired by grey wolf hunting behavior.
-The algorithm optimizes the global flow distribution across the network.
+GWO là thuật toán metaheuristic lấy cảm hứng từ hành vi săn mồi của sói xám.
+Thuật toán tối ưu hóa phân phối luồng toàn cục trên mạng lưới.
 
-Wolf hierarchy:
-- Alpha (α): Best solution
-- Beta (β): Second best solution
-- Delta (δ): Third best solution
-- Omega (ω): Rest of the population
+Hệ thống cấp bậc sói:
+- Alpha (α): Giải pháp tốt nhất
+- Beta (β): Giải pháp tốt thứ hai
+- Delta (δ): Giải pháp tốt thứ ba
+- Omega (ω): Các cá thể còn lại trong quần thể
 """
 
 from typing import List, Dict, Optional, Tuple, Any
@@ -26,52 +26,52 @@ from ..models.node import PopulationZone, Shelter, haversine_distance
 
 @dataclass
 class Wolf:
-    """Represents a wolf (solution) in the GWO algorithm."""
-    position: np.ndarray  # Flow distribution matrix [n_zones x n_shelters]
+    """Đại diện cho một con sói (giải pháp) trong thuật toán GWO."""
+    position: np.ndarray  # Ma trận phân phối luồng [n_zones x n_shelters]
     fitness: float = float('inf')
 
     def copy(self) -> 'Wolf':
-        """Create a copy of this wolf."""
+        """Tạo một bản sao của con sói này."""
         return Wolf(position=self.position.copy(), fitness=self.fitness)
 
 
 class GreyWolfOptimizer(BaseAlgorithm):
     """
-    Grey Wolf Optimizer for evacuation flow distribution.
+    Thuật toán Tối ưu hóa Bầy Sói Xám cho phân phối luồng sơ tán.
 
-    Optimizes how population should be distributed from zones to shelters
-    to minimize total evacuation time while respecting constraints.
+    Tối ưu hóa cách phân phối dân số từ các khu vực đến các nơi trú ẩn
+    để giảm thiểu tổng thời gian sơ tán trong khi vẫn đảm bảo các ràng buộc.
     """
 
     def __init__(self, network: EvacuationNetwork, config: Optional[AlgorithmConfig] = None):
         """
-        Initialize GWO algorithm.
+        Khởi tạo thuật toán GWO.
 
         Args:
-            network: The evacuation network
-            config: Algorithm configuration (optional)
+            network: Mạng lưới sơ tán
+            config: Cấu hình thuật toán (tùy chọn)
         """
         super().__init__(network)
         self.config = config or AlgorithmConfig()
 
-        # GWO parameters
+        # Các tham số GWO
         self.n_wolves = self.config.n_wolves
         self.max_iterations = self.config.max_iterations
         self.a_initial = self.config.a_initial
 
-        # Population and wolves
+        # Quần thể và các con sói
         self.wolves: List[Wolf] = []
         self.alpha: Optional[Wolf] = None
         self.beta: Optional[Wolf] = None
         self.delta: Optional[Wolf] = None
 
-        # Problem dimensions (set during optimization)
+        # Các chiều của bài toán (được thiết lập trong quá trình tối ưu hóa)
         self.n_zones = 0
         self.n_shelters = 0
         self.zones: List[PopulationZone] = []
         self.shelters: List[Shelter] = []
 
-        # Precomputed distances for fitness evaluation
+        # Ma trận khoảng cách được tính trước để đánh giá fitness
         self._distance_matrix: Optional[np.ndarray] = None
         self._risk_matrix: Optional[np.ndarray] = None
 
@@ -80,13 +80,13 @@ class GreyWolfOptimizer(BaseAlgorithm):
         return AlgorithmType.GWO
 
     def _initialize_problem(self) -> None:
-        """Initialize problem dimensions and precompute matrices."""
+        """Khởi tạo các chiều của bài toán và tính trước các ma trận."""
         self.zones = self.network.get_population_zones()
         self.shelters = self.network.get_shelters()
         self.n_zones = len(self.zones)
         self.n_shelters = len(self.shelters)
 
-        # Precompute distance matrix
+        # Tính trước ma trận khoảng cách
         self._distance_matrix = np.zeros((self.n_zones, self.n_shelters))
         for i, zone in enumerate(self.zones):
             for j, shelter in enumerate(self.shelters):
@@ -94,7 +94,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
                     zone.lat, zone.lon, shelter.lat, shelter.lon
                 )
 
-        # Precompute risk matrix (based on path midpoint risk)
+        # Tính trước ma trận rủi ro (dựa trên rủi ro tại điểm giữa đường đi)
         self._risk_matrix = np.zeros((self.n_zones, self.n_shelters))
         for i, zone in enumerate(self.zones):
             for j, shelter in enumerate(self.shelters):
@@ -103,26 +103,26 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 self._risk_matrix[i, j] = self.network.get_total_risk_at(mid_lat, mid_lon)
 
     def _initialize_population(self) -> None:
-        """Initialize wolf population with random solutions."""
+        """Khởi tạo quần thể sói với các giải pháp ngẫu nhiên."""
         self.wolves = []
 
         for _ in range(self.n_wolves):
-            # Random flow distribution
+            # Phân phối luồng ngẫu nhiên
             position = np.random.rand(self.n_zones, self.n_shelters)
-            # Normalize rows (each zone's flow sums to 1)
+            # Chuẩn hóa các hàng (luồng của mỗi khu vực tổng bằng 1)
             row_sums = position.sum(axis=1, keepdims=True)
-            row_sums[row_sums == 0] = 1  # Avoid division by zero
+            row_sums[row_sums == 0] = 1  # Tránh chia cho 0
             position = position / row_sums
 
             wolf = Wolf(position=position)
             wolf.fitness = self._calculate_fitness(wolf.position)
             self.wolves.append(wolf)
 
-        # Sort and identify alpha, beta, delta
+        # Sắp xếp và xác định alpha, beta, delta
         self._update_hierarchy()
 
     def _update_hierarchy(self) -> None:
-        """Update alpha, beta, delta wolves based on fitness."""
+        """Cập nhật các con sói alpha, beta, delta dựa trên fitness."""
         sorted_wolves = sorted(self.wolves, key=lambda w: w.fitness)
         self.alpha = sorted_wolves[0].copy()
         self.beta = sorted_wolves[1].copy() if len(sorted_wolves) > 1 else self.alpha.copy()
@@ -130,21 +130,21 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
     def _calculate_fitness(self, position: np.ndarray) -> float:
         """
-        Calculate fitness (cost) of a solution.
+        Tính toán fitness (chi phí) của một giải pháp.
 
-        Lower fitness is better. Considers:
-        - Total evacuation time (weighted by flow)
-        - Shelter capacity violations
-        - Risk exposure
-        - Flow balance
+        Fitness thấp hơn là tốt hơn. Xem xét:
+        - Tổng thời gian sơ tán (có trọng số theo luồng)
+        - Vi phạm sức chứa của nơi trú ẩn
+        - Phơi nhiễm rủi ro
+        - Cân bằng luồng
         """
-        # Get population array
+        # Lấy mảng dân số
         populations = np.array([z.population for z in self.zones])
         capacities = np.array([s.capacity for s in self.shelters])
         total_capacity = capacities.sum()
 
-        # Limit populations to total shelter capacity for realistic optimization
-        # Scale down proportionally if population exceeds capacity
+        # Giới hạn dân số theo tổng sức chứa của nơi trú ẩn để tối ưu hóa thực tế
+        # Giảm tỷ lệ nếu dân số vượt quá sức chứa
         total_pop = populations.sum()
         if total_pop > total_capacity:
             scale_factor = total_capacity / total_pop
@@ -152,30 +152,30 @@ class GreyWolfOptimizer(BaseAlgorithm):
         else:
             effective_populations = populations
 
-        # Calculate actual flows
+        # Tính toán luồng thực tế
         flows = position * effective_populations[:, np.newaxis]
 
-        # 1. Time cost (flow * distance / speed) - normalized
-        # Assume average speed of 30 km/h
+        # 1. Chi phí thời gian (luồng * khoảng cách / tốc độ) - chuẩn hóa
+        # Giả sử tốc độ trung bình là 30 km/h
         avg_speed = 30.0
-        time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Normalize
+        time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Chuẩn hóa
 
-        # 2. Risk cost - normalized
+        # 2. Chi phí rủi ro - chuẩn hóa
         risk_cost = np.sum(flows * self._risk_matrix) / 1000.0
 
-        # 3. Capacity violation penalty - normalized
+        # 3. Phạt vi phạm sức chứa - chuẩn hóa
         shelter_loads = flows.sum(axis=0)
         capacity_violations = np.maximum(0, shelter_loads - capacities)
-        capacity_penalty = np.sum(capacity_violations / (capacities + 1)) * 10  # Relative violation
+        capacity_penalty = np.sum(capacity_violations / (capacities + 1)) * 10  # Vi phạm tương đối
 
-        # 4. Flow balance penalty (prefer even distribution)
+        # 4. Phạt mất cân bằng luồng (ưu tiên phân phối đồng đều)
         if capacities.sum() > 0:
             utilization = shelter_loads / (capacities + 1)
             balance_penalty = np.std(utilization) * 5
         else:
             balance_penalty = 0
 
-        # 5. Coverage penalty - use effective population
+        # 5. Phạt độ bao phủ - sử dụng dân số hiệu quả
         total_flow = flows.sum()
         total_effective = effective_populations.sum()
         if total_effective > 0:
@@ -188,99 +188,99 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
     def _update_position(self, wolf: Wolf, a: float) -> None:
         """
-        Update wolf position based on alpha, beta, delta.
+        Cập nhật vị trí của con sói dựa trên alpha, beta, delta.
 
         Args:
-            wolf: Wolf to update
-            a: Exploration parameter (decreases over iterations)
+            wolf: Con sói cần cập nhật
+            a: Tham số khám phá (giảm dần theo các vòng lặp)
         """
         for i in range(self.n_zones):
             for j in range(self.n_shelters):
-                # Calculate position updates from alpha, beta, delta
-                # Alpha influence
+                # Tính toán cập nhật vị trí từ alpha, beta, delta
+                # Ảnh hưởng của Alpha
                 r1, r2 = np.random.rand(2)
                 A1 = 2 * a * r1 - a
                 C1 = 2 * r2
                 D_alpha = abs(C1 * self.alpha.position[i, j] - wolf.position[i, j])
                 X1 = self.alpha.position[i, j] - A1 * D_alpha
 
-                # Beta influence
+                # Ảnh hưởng của Beta
                 r1, r2 = np.random.rand(2)
                 A2 = 2 * a * r1 - a
                 C2 = 2 * r2
                 D_beta = abs(C2 * self.beta.position[i, j] - wolf.position[i, j])
                 X2 = self.beta.position[i, j] - A2 * D_beta
 
-                # Delta influence
+                # Ảnh hưởng của Delta
                 r1, r2 = np.random.rand(2)
                 A3 = 2 * a * r1 - a
                 C3 = 2 * r2
                 D_delta = abs(C3 * self.delta.position[i, j] - wolf.position[i, j])
                 X3 = self.delta.position[i, j] - A3 * D_delta
 
-                # Average of three influences
+                # Trung bình của ba ảnh hưởng
                 wolf.position[i, j] = (X1 + X2 + X3) / 3
 
-        # Clip to valid range and normalize
+        # Cắt bớt về phạm vi hợp lệ và chuẩn hóa
         wolf.position = np.clip(wolf.position, 0, 1)
         row_sums = wolf.position.sum(axis=1, keepdims=True)
         row_sums[row_sums == 0] = 1
         wolf.position = wolf.position / row_sums
 
-        # Recalculate fitness
+        # Tính lại fitness
         wolf.fitness = self._calculate_fitness(wolf.position)
 
     def optimize(self, **kwargs) -> Tuple[EvacuationPlan, AlgorithmMetrics]:
         """
-        Run GWO optimization.
+        Chạy tối ưu hóa GWO.
 
         Returns:
-            Tuple of (EvacuationPlan, AlgorithmMetrics)
+            Tuple của (EvacuationPlan, AlgorithmMetrics)
         """
         start_time = self._start_timer()
 
-        # Initialize problem
+        # Khởi tạo bài toán
         self._initialize_problem()
 
         if self.n_zones == 0 or self.n_shelters == 0:
             self._stop_timer(start_time)
             return EvacuationPlan(algorithm_type=AlgorithmType.GWO), self._metrics
 
-        # Initialize population
+        # Khởi tạo quần thể
         self._initialize_population()
 
-        # Main optimization loop
+        # Vòng lặp tối ưu hóa chính
         for iteration in range(self.max_iterations):
             if self._should_stop:
                 break
 
-            # Linearly decrease a from a_initial to 0
+            # Giảm tuyến tính a từ a_initial về 0
             a = self.a_initial - iteration * (self.a_initial / self.max_iterations)
 
-            # Update each wolf
+            # Cập nhật từng con sói
             for wolf in self.wolves:
                 self._update_position(wolf, a)
 
-            # Update hierarchy
+            # Cập nhật hệ thống cấp bậc
             self._update_hierarchy()
 
-            # Record convergence
+            # Ghi lại quá trình hội tụ
             self._metrics.convergence_history.append(self.alpha.fitness)
 
-            # Report progress
+            # Báo cáo tiến trình
             self.report_progress(iteration + 1, self.alpha.fitness, self.alpha.position)
 
-        # Convert best solution to evacuation plan
+        # Chuyển đổi giải pháp tốt nhất thành kế hoạch sơ tán
         plan = self._convert_to_plan(self.alpha.position)
 
-        # Finalize metrics
+        # Hoàn thiện các chỉ số
         self._stop_timer(start_time)
         self._metrics.iterations = len(self._metrics.convergence_history)
         self._metrics.final_cost = self.alpha.fitness
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
 
-        # Coverage rate: evacuees covered / min(total_population, total_capacity)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
         total_population = sum(z.population for z in self.zones)
         total_capacity = sum(s.capacity for s in self.shelters)
         max_possible = min(total_population, total_capacity)
@@ -292,40 +292,40 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
     def _convert_to_plan(self, position: np.ndarray) -> EvacuationPlan:
         """
-        Convert GWO solution (flow matrix) to EvacuationPlan.
+        Chuyển đổi giải pháp GWO (ma trận luồng) thành EvacuationPlan.
 
         Args:
-            position: Flow distribution matrix
+            position: Ma trận phân phối luồng
 
         Returns:
-            EvacuationPlan with routes
+            EvacuationPlan với các tuyến đường
         """
         plan = EvacuationPlan(algorithm_type=AlgorithmType.GWO)
 
         populations = np.array([z.population for z in self.zones])
         capacities = np.array([s.capacity for s in self.shelters])
 
-        # Calculate actual flows
+        # Tính toán luồng thực tế
         flows = position * populations[:, np.newaxis]
 
-        # Track shelter occupancy
+        # Theo dõi mức độ sử dụng của nơi trú ẩn
         shelter_occupancy = np.zeros(self.n_shelters)
 
         for i, zone in enumerate(self.zones):
             for j, shelter in enumerate(self.shelters):
                 flow = int(flows[i, j])
 
-                # Apply capacity constraint
+                # Áp dụng ràng buộc sức chứa
                 available = capacities[j] - shelter_occupancy[j]
                 actual_flow = min(flow, int(available))
 
                 if actual_flow >= self.config.min_flow_threshold:
-                    # Create simple direct path (GWO doesn't do pathfinding)
-                    # The actual path will be refined by hybrid algorithm or GBFS
+                    # Tạo đường đi trực tiếp đơn giản (GWO không thực hiện tìm đường)
+                    # Đường đi thực tế sẽ được tinh chỉnh bởi thuật toán hybrid hoặc GBFS
                     path = [zone.id, shelter.id]
 
                     distance = self._distance_matrix[i, j]
-                    time_hours = distance / 30.0  # Assume 30 km/h
+                    time_hours = distance / 30.0  # Giả sử 30 km/h
                     risk = self._risk_matrix[i, j]
 
                     route = EvacuationRoute(
@@ -343,13 +343,13 @@ class GreyWolfOptimizer(BaseAlgorithm):
         return plan
 
     def get_flow_matrix(self) -> Optional[np.ndarray]:
-        """Get the optimized flow distribution matrix."""
+        """Lấy ma trận phân phối luồng đã được tối ưu hóa."""
         if self.alpha:
             return self.alpha.position.copy()
         return None
 
     def get_best_fitness(self) -> float:
-        """Get the best fitness value found."""
+        """Lấy giá trị fitness tốt nhất tìm được."""
         if self.alpha:
             return self.alpha.fitness
         return float('inf')

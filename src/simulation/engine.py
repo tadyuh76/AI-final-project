@@ -1,11 +1,11 @@
 """
-Simulation Engine for evacuation scenarios.
+Công cụ Mô phỏng cho các kịch bản sơ tán.
 
-Provides time-stepped simulation of evacuation with:
-- Progressive evacuation flow along routes
-- Dynamic hazard progression
-- Real-time metrics tracking
-- Event-driven updates
+Cung cấp mô phỏng sơ tán theo bước thời gian với:
+- Dòng chảy sơ tán tiến triển dọc theo các tuyến đường
+- Tiến triển nguy hiểm động
+- Theo dõi chỉ số thời gian thực
+- Cập nhật theo sự kiện
 """
 
 from typing import Dict, List, Optional, Callable, Any, Tuple
@@ -21,7 +21,7 @@ from ..algorithms.base import EvacuationPlan, EvacuationRoute
 
 
 class SimulationState(Enum):
-    """Possible states of the simulation."""
+    """Các trạng thái có thể có của mô phỏng."""
     IDLE = "idle"
     RUNNING = "running"
     PAUSED = "paused"
@@ -31,27 +31,27 @@ class SimulationState(Enum):
 
 @dataclass
 class SimulationConfig:
-    """Configuration for simulation parameters."""
-    time_step_minutes: float = 5.0  # Simulation time step
-    max_duration_hours: float = 24.0  # Maximum simulation duration
-    speed_multiplier: float = 1.0  # Real-time speed multiplier
+    """Cấu hình cho các tham số mô phỏng."""
+    time_step_minutes: float = 5.0  # Bước thời gian mô phỏng
+    max_duration_hours: float = 24.0  # Thời lượng mô phỏng tối đa
+    speed_multiplier: float = 1.0  # Hệ số nhân tốc độ thời gian thực
 
-    # Flow parameters
-    flow_rate_per_step: float = 0.1  # Fraction of remaining population per step
-    min_flow_per_route: int = 10  # Minimum evacuees per route per step
+    # Tham số dòng chảy
+    flow_rate_per_step: float = 0.1  # Phần trăm dân số còn lại mỗi bước
+    min_flow_per_route: int = 10  # Số người sơ tán tối thiểu mỗi tuyến đường mỗi bước
 
-    # Hazard progression
-    hazard_expansion_rate: float = 0.01  # km per time step
-    hazard_intensity_growth: float = 0.005  # Risk increase per step
+    # Tiến triển nguy hiểm
+    hazard_expansion_rate: float = 0.01  # km mỗi bước thời gian
+    hazard_intensity_growth: float = 0.005  # Mức tăng rủi ro mỗi bước
 
-    # Congestion effects
-    congestion_threshold: float = 0.7  # Flow/capacity ratio for congestion
-    congestion_speed_factor: float = 0.5  # Speed reduction at full congestion
+    # Ảnh hưởng của tắc nghẽn
+    congestion_threshold: float = 0.7  # Tỷ lệ dòng chảy/công suất cho tắc nghẽn
+    congestion_speed_factor: float = 0.5  # Giảm tốc độ ở mức tắc nghẽn hoàn toàn
 
 
 @dataclass
 class SimulationMetrics:
-    """Real-time metrics during simulation."""
+    """Chỉ số thời gian thực trong quá trình mô phỏng."""
     current_time_hours: float = 0.0
     total_evacuated: int = 0
     total_remaining: int = 0
@@ -59,23 +59,23 @@ class SimulationMetrics:
     completed_routes: int = 0
     blocked_routes: int = 0
 
-    # Shelter metrics
+    # Chỉ số nơi trú ẩn
     shelter_utilization: Dict[str, float] = field(default_factory=dict)
     shelter_arrivals: Dict[str, int] = field(default_factory=dict)
 
-    # Route metrics
+    # Chỉ số tuyến đường
     average_travel_time: float = 0.0
     average_risk_exposure: float = 0.0
 
-    # Progress tracking
-    evacuation_progress: float = 0.0  # 0.0 to 1.0
+    # Theo dõi tiến độ
+    evacuation_progress: float = 0.0  # 0.0 đến 1.0
     estimated_completion_hours: float = 0.0
 
-    # History for visualization
+    # Lịch sử cho trực quan hóa
     evacuation_history: List[Tuple[float, int]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
+        """Chuyển đổi sang từ điển để tuần tự hóa."""
         return {
             'current_time_hours': self.current_time_hours,
             'total_evacuated': self.total_evacuated,
@@ -92,62 +92,62 @@ class SimulationMetrics:
 
 @dataclass
 class RouteState:
-    """State of an individual evacuation route during simulation."""
+    """Trạng thái của một tuyến đường sơ tán cá nhân trong quá trình mô phỏng."""
     route: EvacuationRoute
-    total_assigned: int  # Total people assigned to this route
-    departed: int = 0  # People who have started evacuation
-    in_transit: int = 0  # People currently on the route
-    arrived: int = 0  # People who have reached shelter
-    blocked: bool = False  # Route is blocked by hazard
+    total_assigned: int  # Tổng số người được phân công cho tuyến đường này
+    departed: int = 0  # Số người đã bắt đầu sơ tán
+    in_transit: int = 0  # Số người hiện đang trên đường
+    arrived: int = 0  # Số người đã đến nơi trú ẩn
+    blocked: bool = False  # Tuyến đường bị chặn bởi nguy hiểm
 
-    # Timing
+    # Thời gian
     start_time: float = 0.0
     estimated_arrival: float = 0.0
 
-    # Tracking evacuees in transit with their progress
+    # Theo dõi người sơ tán đang di chuyển với tiến độ của họ
     evacuee_groups: List[Dict[str, Any]] = field(default_factory=list)
 
     @property
     def remaining(self) -> int:
-        """People still waiting to depart."""
+        """Số người vẫn đang chờ khởi hành."""
         return max(0, self.total_assigned - self.departed)
 
     @property
     def is_complete(self) -> bool:
-        """Check if all assigned evacuees have arrived."""
+        """Kiểm tra xem tất cả người sơ tán được phân công đã đến nơi chưa."""
         return self.arrived >= self.total_assigned and self.in_transit == 0
 
 
-# Type alias for callbacks
+# Bí danh kiểu cho callbacks
 SimulationCallback = Callable[[SimulationMetrics, Dict[str, RouteState]], None]
 
 
 class SimulationEngine:
     """
-    Time-stepped evacuation simulation engine.
+    Công cụ mô phỏng sơ tán theo bước thời gian.
 
-    Simulates the evacuation process over time with:
-    - Gradual population movement along routes
-    - Dynamic congestion based on flow
-    - Hazard zone progression
-    - Real-time metrics updates
+    Mô phỏng quá trình sơ tán theo thời gian với:
+    - Di chuyển dân số dần dần dọc theo các tuyến đường
+    - Tắc nghẽn động dựa trên dòng chảy
+    - Tiến triển vùng nguy hiểm
+    - Cập nhật chỉ số thời gian thực
     """
 
     def __init__(self, network: EvacuationNetwork,
                  config: Optional[SimulationConfig] = None):
         """
-        Initialize simulation engine.
+        Khởi tạo công cụ mô phỏng.
 
         Args:
-            network: The evacuation network
-            config: Simulation configuration
+            network: Mạng lưới sơ tán
+            config: Cấu hình mô phỏng
         """
         self.network = network
         self.config = config or SimulationConfig()
 
-        # State
+        # Trạng thái
         self._state = SimulationState.IDLE
-        self._current_time = 0.0  # Simulation time in hours
+        self._current_time = 0.0  # Thời gian mô phỏng tính bằng giờ
         self._metrics = SimulationMetrics()
         self._route_states: Dict[str, RouteState] = {}
 
@@ -155,58 +155,58 @@ class SimulationEngine:
         self._update_callback: Optional[SimulationCallback] = None
         self._completion_callback: Optional[Callable[[SimulationMetrics], None]] = None
 
-        # Control
+        # Điều khiển
         self._should_stop = False
         self._is_paused = False
 
-        # Initial population snapshot
+        # Ảnh chụp dân số ban đầu
         self._initial_population = 0
 
     @property
     def state(self) -> SimulationState:
-        """Get current simulation state."""
+        """Lấy trạng thái mô phỏng hiện tại."""
         return self._state
 
     @property
     def metrics(self) -> SimulationMetrics:
-        """Get current metrics."""
+        """Lấy chỉ số hiện tại."""
         return self._metrics
 
     @property
     def current_time(self) -> float:
-        """Get current simulation time in hours."""
+        """Lấy thời gian mô phỏng hiện tại tính bằng giờ."""
         return self._current_time
 
     def set_update_callback(self, callback: SimulationCallback) -> None:
-        """Set callback for simulation updates."""
+        """Đặt callback cho cập nhật mô phỏng."""
         self._update_callback = callback
 
     def set_completion_callback(self,
                                 callback: Callable[[SimulationMetrics], None]) -> None:
-        """Set callback for simulation completion."""
+        """Đặt callback cho hoàn thành mô phỏng."""
         self._completion_callback = callback
 
     def initialize(self, plan: EvacuationPlan) -> None:
         """
-        Initialize simulation with an evacuation plan.
+        Khởi tạo mô phỏng với một kế hoạch sơ tán.
 
         Args:
-            plan: The evacuation plan to simulate
+            plan: Kế hoạch sơ tán để mô phỏng
         """
         self._state = SimulationState.IDLE
         self._current_time = 0.0
         self._should_stop = False
         self._is_paused = False
 
-        # Reset network state
+        # Đặt lại trạng thái mạng lưới
         self.network.reset_simulation_state()
 
-        # Calculate initial population
+        # Tính toán dân số ban đầu
         self._initial_population = sum(
             z.population for z in self.network.get_population_zones()
         )
 
-        # Initialize route states
+        # Khởi tạo trạng thái tuyến đường
         self._route_states.clear()
         for i, route in enumerate(plan.routes):
             route_id = f"route_{i}_{route.zone_id}_{route.shelter_id}"
@@ -216,13 +216,13 @@ class SimulationEngine:
                 estimated_arrival=route.estimated_time_hours
             )
 
-        # Initialize metrics
+        # Khởi tạo chỉ số
         self._metrics = SimulationMetrics(
             total_remaining=self._initial_population,
             active_routes=len(self._route_states)
         )
 
-        # Initialize shelter utilization tracking
+        # Khởi tạo theo dõi mức sử dụng nơi trú ẩn
         for shelter in self.network.get_shelters():
             self._metrics.shelter_utilization[shelter.id] = 0.0
             self._metrics.shelter_arrivals[shelter.id] = 0
@@ -230,14 +230,14 @@ class SimulationEngine:
     def run(self, plan: EvacuationPlan,
             real_time: bool = False) -> SimulationMetrics:
         """
-        Run the simulation to completion.
+        Chạy mô phỏng đến khi hoàn thành.
 
         Args:
-            plan: Evacuation plan to simulate
-            real_time: If True, run in real-time with delays
+            plan: Kế hoạch sơ tán để mô phỏng
+            real_time: Nếu True, chạy theo thời gian thực với độ trễ
 
         Returns:
-            Final simulation metrics
+            Chỉ số mô phỏng cuối cùng
         """
         self.initialize(plan)
         self._state = SimulationState.RUNNING
@@ -255,20 +255,20 @@ class SimulationEngine:
                 if self._should_stop:
                     break
 
-            # Perform simulation step
+            # Thực hiện bước mô phỏng
             self._step(time_step_hours)
 
-            # Check completion
+            # Kiểm tra hoàn thành
             if self._is_evacuation_complete():
                 self._state = SimulationState.COMPLETED
                 break
 
-            # Real-time delay
+            # Độ trễ thời gian thực
             if real_time:
                 delay = (self.config.time_step_minutes * 60) / self.config.speed_multiplier
                 time.sleep(delay)
 
-        # Final callback
+        # Callback cuối cùng
         if self._completion_callback:
             self._completion_callback(self._metrics)
 
@@ -276,10 +276,10 @@ class SimulationEngine:
 
     def step(self) -> SimulationMetrics:
         """
-        Execute a single simulation step.
+        Thực hiện một bước mô phỏng đơn.
 
         Returns:
-            Updated metrics after step
+            Chỉ số cập nhật sau bước
         """
         if self._state == SimulationState.IDLE:
             return self._metrics
@@ -290,25 +290,25 @@ class SimulationEngine:
         return self._metrics
 
     def _step(self, time_step_hours: float) -> None:
-        """Internal step execution."""
+        """Thực thi bước nội bộ."""
         self._current_time += time_step_hours
 
-        # 1. Update hazard zones (progression)
+        # 1. Cập nhật vùng nguy hiểm (tiến triển)
         self._update_hazards(time_step_hours)
 
-        # 2. Check for blocked routes
+        # 2. Kiểm tra tuyến đường bị chặn
         self._check_route_blockages()
 
-        # 3. Process departures from zones
+        # 3. Xử lý khởi hành từ các khu vực
         self._process_departures(time_step_hours)
 
-        # 4. Move evacuees in transit
+        # 4. Di chuyển người sơ tán đang trên đường
         self._process_transit(time_step_hours)
 
-        # 5. Process arrivals at shelters
+        # 5. Xử lý đến nơi tại các nơi trú ẩn
         self._process_arrivals()
 
-        # 6. Update metrics
+        # 6. Cập nhật chỉ số
         self._update_metrics()
 
         # 7. Callback
@@ -316,16 +316,16 @@ class SimulationEngine:
             self._update_callback(self._metrics, self._route_states)
 
     def _update_hazards(self, time_step_hours: float) -> None:
-        """Update hazard zones (expansion, intensity)."""
+        """Cập nhật vùng nguy hiểm (mở rộng, cường độ)."""
         for hazard in self.network.get_hazard_zones():
-            # Expand radius
+            # Mở rộng bán kính
             hazard.radius_km += self.config.hazard_expansion_rate * (time_step_hours * 60)
 
-            # Increase intensity (capped at 1.0)
+            # Tăng cường độ (giới hạn ở 1.0)
             hazard.risk_level = min(1.0,
                 hazard.risk_level + self.config.hazard_intensity_growth * (time_step_hours * 60))
 
-        # Update edge risks based on new hazard positions
+        # Cập nhật rủi ro cạnh dựa trên vị trí nguy hiểm mới
         for edge in self.network.get_edges():
             source = self.network.get_node(edge.source_id)
             target = self.network.get_node(edge.target_id)
@@ -336,12 +336,12 @@ class SimulationEngine:
                 edge.set_flood_risk(risk)
 
     def _check_route_blockages(self) -> None:
-        """Check if any routes are blocked by hazards."""
+        """Kiểm tra xem có tuyến đường nào bị chặn bởi nguy hiểm không."""
         for route_id, state in self._route_states.items():
             if state.blocked:
                 continue
 
-            # Check each edge in the route
+            # Kiểm tra từng cạnh trong tuyến đường
             path = state.route.path
             for i in range(len(path) - 1):
                 edge = self.network.get_edge_between(path[i], path[i + 1])
@@ -350,14 +350,14 @@ class SimulationEngine:
                     break
 
     def _process_departures(self, time_step_hours: float) -> None:
-        """Process evacuees departing from zones."""
+        """Xử lý người sơ tán khởi hành từ các khu vực."""
         for route_id, state in self._route_states.items():
             if state.blocked or state.remaining <= 0:
                 continue
 
-            # Calculate departure rate
-            # More people leave as time goes on (urgency)
-            urgency_factor = 1.0 + (self._current_time / 2.0)  # Increases over time
+            # Tính toán tỷ lệ khởi hành
+            # Càng nhiều người rời đi khi thời gian trôi qua (tính cấp thiết)
+            urgency_factor = 1.0 + (self._current_time / 2.0)  # Tăng theo thời gian
             base_rate = self.config.flow_rate_per_step * urgency_factor
 
             departing = max(
@@ -367,13 +367,13 @@ class SimulationEngine:
             departing = min(departing, state.remaining)
 
             if departing > 0:
-                # Add to edge flows
+                # Thêm vào dòng chảy cạnh
                 self._add_flow_to_path(state.route.path, departing)
 
-                # Create evacuee group
+                # Tạo nhóm người sơ tán
                 state.evacuee_groups.append({
                     'count': departing,
-                    'progress': 0.0,  # 0.0 = at start, 1.0 = at destination
+                    'progress': 0.0,  # 0.0 = ở điểm bắt đầu, 1.0 = ở điểm đến
                     'departure_time': self._current_time
                 })
 
@@ -381,47 +381,47 @@ class SimulationEngine:
                 state.in_transit += departing
 
     def _process_transit(self, time_step_hours: float) -> None:
-        """Move evacuees along their routes."""
+        """Di chuyển người sơ tán dọc theo tuyến đường của họ."""
         for route_id, state in self._route_states.items():
             if not state.evacuee_groups:
                 continue
 
-            # Calculate movement based on route travel time
+            # Tính toán di chuyển dựa trên thời gian di chuyển tuyến đường
             base_travel_time = state.route.estimated_time_hours
             if base_travel_time <= 0:
-                base_travel_time = 0.1  # Minimum travel time
+                base_travel_time = 0.1  # Thời gian di chuyển tối thiểu
 
-            # Apply congestion factor
+            # Áp dụng hệ số tắc nghẽn
             congestion_factor = self._get_route_congestion(state.route.path)
             effective_travel_time = base_travel_time * (1.0 + congestion_factor)
 
-            # Progress per time step
+            # Tiến độ mỗi bước thời gian
             progress_per_step = time_step_hours / effective_travel_time
 
-            # Update each group
+            # Cập nhật từng nhóm
             completed_groups = []
             for group in state.evacuee_groups:
                 group['progress'] += progress_per_step
                 if group['progress'] >= 1.0:
                     completed_groups.append(group)
 
-            # Process completed groups
+            # Xử lý các nhóm đã hoàn thành
             for group in completed_groups:
                 state.evacuee_groups.remove(group)
                 state.in_transit -= group['count']
                 state.arrived += group['count']
 
-                # Remove flow from path
+                # Xóa dòng chảy khỏi đường dẫn
                 self._remove_flow_from_path(state.route.path, group['count'])
 
     def _process_arrivals(self) -> None:
-        """Process evacuees arriving at shelters."""
+        """Xử lý người sơ tán đến nơi tại các nơi trú ẩn."""
         for route_id, state in self._route_states.items():
             if state.arrived > self._metrics.shelter_arrivals.get(state.route.shelter_id, 0):
                 new_arrivals = state.arrived - self._metrics.shelter_arrivals.get(
                     state.route.shelter_id, 0)
 
-                # Update shelter
+                # Cập nhật nơi trú ẩn
                 shelter = self.network.get_node(state.route.shelter_id)
                 if isinstance(shelter, Shelter):
                     admitted = shelter.admit(new_arrivals)
@@ -430,21 +430,21 @@ class SimulationEngine:
                     self._metrics.shelter_utilization[shelter.id] = shelter.occupancy_rate
 
     def _add_flow_to_path(self, path: List[str], count: int) -> None:
-        """Add flow to all edges in a path."""
+        """Thêm dòng chảy cho tất cả các cạnh trong một đường dẫn."""
         for i in range(len(path) - 1):
             edge = self.network.get_edge_between(path[i], path[i + 1])
             if edge:
                 edge.add_flow(count)
 
     def _remove_flow_from_path(self, path: List[str], count: int) -> None:
-        """Remove flow from all edges in a path."""
+        """Xóa dòng chảy khỏi tất cả các cạnh trong một đường dẫn."""
         for i in range(len(path) - 1):
             edge = self.network.get_edge_between(path[i], path[i + 1])
             if edge:
                 edge.remove_flow(count)
 
     def _get_route_congestion(self, path: List[str]) -> float:
-        """Calculate average congestion along a route."""
+        """Tính toán mức tắc nghẽn trung bình dọc theo tuyến đường."""
         if len(path) < 2:
             return 0.0
 
@@ -462,7 +462,7 @@ class SimulationEngine:
 
         avg_congestion = total_congestion / edge_count
 
-        # Apply non-linear congestion effect
+        # Áp dụng hiệu ứng tắc nghẽn phi tuyến
         if avg_congestion > self.config.congestion_threshold:
             excess = avg_congestion - self.config.congestion_threshold
             return excess * (1.0 / (1.0 - self.config.congestion_threshold))
@@ -470,7 +470,7 @@ class SimulationEngine:
         return 0.0
 
     def _update_metrics(self) -> None:
-        """Update simulation metrics."""
+        """Cập nhật chỉ số mô phỏng."""
         total_evacuated = 0
         total_in_transit = 0
         active_routes = 0
@@ -490,7 +490,7 @@ class SimulationEngine:
             else:
                 active_routes += 1
 
-            # Accumulate weighted metrics
+            # Tích lũy chỉ số có trọng số
             if state.arrived > 0:
                 total_travel_time += state.route.estimated_time_hours * state.arrived
                 total_risk += state.route.risk_score * state.arrived
@@ -502,16 +502,16 @@ class SimulationEngine:
         self._metrics.completed_routes = completed_routes
         self._metrics.blocked_routes = blocked_routes
 
-        # Calculate averages
+        # Tính toán trung bình
         if total_evacuated > 0:
             self._metrics.average_travel_time = total_travel_time / total_evacuated
             self._metrics.average_risk_exposure = total_risk / total_evacuated
 
-        # Progress
+        # Tiến độ
         if self._initial_population > 0:
             self._metrics.evacuation_progress = total_evacuated / self._initial_population
 
-        # Estimate completion time
+        # Ước tính thời gian hoàn thành
         if total_evacuated > 0 and self._current_time > 0:
             rate = total_evacuated / self._current_time
             remaining = self._initial_population - total_evacuated
@@ -519,36 +519,36 @@ class SimulationEngine:
                 self._metrics.estimated_completion_hours = \
                     self._current_time + (remaining / rate)
 
-        # Record history point
+        # Ghi điểm lịch sử
         self._metrics.evacuation_history.append(
             (self._current_time, total_evacuated)
         )
 
     def _is_evacuation_complete(self) -> bool:
-        """Check if evacuation is complete."""
-        # All routes completed or blocked
+        """Kiểm tra xem việc sơ tán đã hoàn thành chưa."""
+        # Tất cả các tuyến đường đã hoàn thành hoặc bị chặn
         for state in self._route_states.values():
             if not state.is_complete and not state.blocked:
                 return False
         return True
 
     def pause(self) -> None:
-        """Pause the simulation."""
+        """Tạm dừng mô phỏng."""
         self._is_paused = True
         self._state = SimulationState.PAUSED
 
     def resume(self) -> None:
-        """Resume the simulation."""
+        """Tiếp tục mô phỏng."""
         self._is_paused = False
         self._state = SimulationState.RUNNING
 
     def stop(self) -> None:
-        """Stop the simulation."""
+        """Dừng mô phỏng."""
         self._should_stop = True
         self._state = SimulationState.IDLE
 
     def reset(self) -> None:
-        """Reset the simulation to initial state."""
+        """Đặt lại mô phỏng về trạng thái ban đầu."""
         self._state = SimulationState.IDLE
         self._current_time = 0.0
         self._should_stop = False
@@ -558,11 +558,11 @@ class SimulationEngine:
         self.network.reset_simulation_state()
 
     def get_route_states(self) -> Dict[str, RouteState]:
-        """Get current route states."""
+        """Lấy trạng thái tuyến đường hiện tại."""
         return self._route_states
 
     def get_evacuation_snapshot(self) -> Dict[str, Any]:
-        """Get a snapshot of current evacuation state for visualization."""
+        """Lấy ảnh chụp trạng thái sơ tán hiện tại để trực quan hóa."""
         snapshot = {
             'time': self._current_time,
             'state': self._state.value,
@@ -572,7 +572,7 @@ class SimulationEngine:
             'hazards': []
         }
 
-        # Route data
+        # Dữ liệu tuyến đường
         for route_id, state in self._route_states.items():
             route_data = {
                 'id': route_id,
@@ -588,7 +588,7 @@ class SimulationEngine:
             }
             snapshot['routes'].append(route_data)
 
-        # Shelter data
+        # Dữ liệu nơi trú ẩn
         for shelter in self.network.get_shelters():
             shelter_data = {
                 'id': shelter.id,
@@ -601,7 +601,7 @@ class SimulationEngine:
             }
             snapshot['shelters'].append(shelter_data)
 
-        # Hazard data
+        # Dữ liệu nguy hiểm
         for i, hazard in enumerate(self.network.get_hazard_zones()):
             hazard_data = {
                 'id': f'hazard_{i}',

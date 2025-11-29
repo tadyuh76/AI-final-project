@@ -1,13 +1,13 @@
 """
-Unit tests for the models module.
-Tests Node, Edge, and Network classes.
+Kiểm thử đơn vị cho module models.
+Kiểm thử các lớp Node, Edge và Network.
 """
 
 import pytest
 import sys
 import os
 
-# Add parent directory to path for imports
+# Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.node import (
@@ -19,23 +19,23 @@ from src.models.network import EvacuationNetwork, NetworkStats
 
 
 class TestHaversineDistance:
-    """Tests for haversine distance calculation."""
+    """Kiểm thử cho hàm tính khoảng cách haversine."""
 
     def test_same_point_returns_zero(self):
-        """Distance from a point to itself should be zero."""
-        lat, lon = 10.7769, 106.7009  # HCM center
+        """Khoảng cách từ một điểm đến chính nó phải bằng không."""
+        lat, lon = 10.7769, 106.7009  # Trung tâm HCM
         assert haversine_distance(lat, lon, lat, lon) == 0.0
 
     def test_known_distance(self):
-        """Test distance between two known points in HCM."""
-        # District 1 to District 7 (approximately 4-5 km)
-        lat1, lon1 = 10.7769, 106.7009  # District 1
-        lat2, lon2 = 10.7365, 106.7218  # District 7
+        """Kiểm tra khoảng cách giữa hai điểm đã biết ở HCM."""
+        # Quận 1 đến Quận 7 (khoảng 4-5 km)
+        lat1, lon1 = 10.7769, 106.7009  # Quận 1
+        lat2, lon2 = 10.7365, 106.7218  # Quận 7
         distance = haversine_distance(lat1, lon1, lat2, lon2)
-        assert 4.0 < distance < 6.0  # Should be around 4-5 km
+        assert 4.0 < distance < 6.0  # Nên khoảng 4-5 km
 
     def test_symmetry(self):
-        """Distance A->B should equal B->A."""
+        """Khoảng cách A->B phải bằng B->A."""
         lat1, lon1 = 10.7769, 106.7009
         lat2, lon2 = 10.8514, 106.7539
         assert haversine_distance(lat1, lon1, lat2, lon2) == \
@@ -43,10 +43,10 @@ class TestHaversineDistance:
 
 
 class TestMercatorConversion:
-    """Tests for coordinate conversion functions."""
+    """Kiểm thử cho các hàm chuyển đổi tọa độ."""
 
     def test_roundtrip_conversion(self):
-        """Converting to Mercator and back should return original coords."""
+        """Chuyển sang Mercator và ngược lại phải trả về tọa độ ban đầu."""
         lat, lon = 10.7769, 106.7009
         x, y = lat_lon_to_mercator(lat, lon)
         lat2, lon2 = mercator_to_lat_lon(x, y)
@@ -55,10 +55,10 @@ class TestMercatorConversion:
 
 
 class TestNode:
-    """Tests for the base Node class."""
+    """Kiểm thử cho lớp Node cơ bản."""
 
     def test_node_creation(self):
-        """Test basic node creation."""
+        """Kiểm tra việc tạo node cơ bản."""
         node = Node(id="n1", lat=10.7769, lon=106.7009)
         assert node.id == "n1"
         assert node.lat == 10.7769
@@ -66,24 +66,24 @@ class TestNode:
         assert node.node_type == NodeType.INTERSECTION
 
     def test_node_pos_property(self):
-        """Test the pos property returns correct tuple."""
+        """Kiểm tra thuộc tính pos trả về tuple đúng."""
         node = Node(id="n1", lat=10.5, lon=106.5)
         assert node.pos == (10.5, 106.5)
 
     def test_node_distance_to(self):
-        """Test distance_to method."""
+        """Kiểm tra phương thức distance_to."""
         node1 = Node(id="n1", lat=10.7769, lon=106.7009)
         node2 = Node(id="n2", lat=10.7365, lon=106.7218)
         distance = node1.distance_to(node2)
         assert distance > 0
-        assert distance < 10  # Should be a few km
+        assert distance < 10  # Nên vài km
 
 
 class TestPopulationZone:
-    """Tests for PopulationZone class."""
+    """Kiểm thử cho lớp PopulationZone."""
 
     def test_population_zone_creation(self):
-        """Test population zone creation with population."""
+        """Kiểm tra việc tạo khu dân cư với dân số."""
         zone = PopulationZone(
             id="zone1",
             lat=10.7769,
@@ -96,7 +96,7 @@ class TestPopulationZone:
         assert zone.node_type == NodeType.POPULATION_ZONE
 
     def test_remaining_population(self):
-        """Test remaining_population calculation."""
+        """Kiểm tra tính toán remaining_population."""
         zone = PopulationZone(
             id="zone1", lat=10.0, lon=106.0,
             population=10000, evacuated=3000
@@ -104,15 +104,15 @@ class TestPopulationZone:
         assert zone.remaining_population == 7000
 
     def test_remaining_population_never_negative(self):
-        """Remaining population should never be negative."""
+        """Dân số còn lại không bao giờ âm."""
         zone = PopulationZone(
             id="zone1", lat=10.0, lon=106.0,
-            population=10000, evacuated=15000  # Over-evacuated
+            population=10000, evacuated=15000  # Sơ tán quá mức
         )
         assert zone.remaining_population == 0
 
     def test_evacuation_progress(self):
-        """Test evacuation_progress calculation."""
+        """Kiểm tra tính toán evacuation_progress."""
         zone = PopulationZone(
             id="zone1", lat=10.0, lon=106.0,
             population=10000, evacuated=2500
@@ -120,16 +120,16 @@ class TestPopulationZone:
         assert zone.evacuation_progress == 0.25
 
     def test_evacuation_progress_zero_population(self):
-        """Evacuation progress should be 1.0 for zero population."""
+        """Tiến độ sơ tán phải là 1.0 cho dân số bằng không."""
         zone = PopulationZone(id="zone1", lat=10.0, lon=106.0, population=0)
         assert zone.evacuation_progress == 1.0
 
 
 class TestShelter:
-    """Tests for Shelter class."""
+    """Kiểm thử cho lớp Shelter."""
 
     def test_shelter_creation(self):
-        """Test shelter creation."""
+        """Kiểm tra việc tạo nơi trú ẩn."""
         shelter = Shelter(
             id="shelter1",
             lat=10.7888,
@@ -143,7 +143,7 @@ class TestShelter:
         assert shelter.node_type == NodeType.SHELTER
 
     def test_available_capacity(self):
-        """Test available_capacity calculation."""
+        """Kiểm tra tính toán available_capacity."""
         shelter = Shelter(
             id="s1", lat=10.0, lon=106.0,
             capacity=1000, current_occupancy=400
@@ -151,7 +151,7 @@ class TestShelter:
         assert shelter.available_capacity == 600
 
     def test_occupancy_rate(self):
-        """Test occupancy_rate calculation."""
+        """Kiểm tra tính toán occupancy_rate."""
         shelter = Shelter(
             id="s1", lat=10.0, lon=106.0,
             capacity=1000, current_occupancy=250
@@ -159,7 +159,7 @@ class TestShelter:
         assert shelter.occupancy_rate == 0.25
 
     def test_has_capacity(self):
-        """Test has_capacity method."""
+        """Kiểm tra phương thức has_capacity."""
         shelter = Shelter(
             id="s1", lat=10.0, lon=106.0,
             capacity=1000, current_occupancy=900
@@ -168,7 +168,7 @@ class TestShelter:
         assert shelter.has_capacity(101) is False
 
     def test_has_capacity_inactive_shelter(self):
-        """Inactive shelter should never have capacity."""
+        """Nơi trú ẩn không hoạt động không bao giờ có sức chứa."""
         shelter = Shelter(
             id="s1", lat=10.0, lon=106.0,
             capacity=1000, is_active=False
@@ -176,14 +176,14 @@ class TestShelter:
         assert shelter.has_capacity(1) is False
 
     def test_admit_evacuees(self):
-        """Test admit method."""
+        """Kiểm tra phương thức admit."""
         shelter = Shelter(id="s1", lat=10.0, lon=106.0, capacity=100)
         admitted = shelter.admit(50)
         assert admitted == 50
         assert shelter.current_occupancy == 50
 
     def test_admit_partial(self):
-        """Admit should only accept up to available capacity."""
+        """Admit chỉ nên chấp nhận đến sức chứa có sẵn."""
         shelter = Shelter(
             id="s1", lat=10.0, lon=106.0,
             capacity=100, current_occupancy=80
@@ -194,10 +194,10 @@ class TestShelter:
 
 
 class TestHazardZone:
-    """Tests for HazardZone class."""
+    """Kiểm thử cho lớp HazardZone."""
 
     def test_hazard_zone_creation(self):
-        """Test hazard zone creation."""
+        """Kiểm tra việc tạo vùng nguy hiểm."""
         hazard = HazardZone(
             center_lat=10.7579,
             center_lon=106.7057,
@@ -209,7 +209,7 @@ class TestHazardZone:
         assert hazard.risk_level == 0.8
 
     def test_risk_at_center(self):
-        """Risk at center should equal risk_level."""
+        """Rủi ro tại tâm phải bằng risk_level."""
         hazard = HazardZone(
             center_lat=10.7579, center_lon=106.7057,
             radius_km=2.0, risk_level=0.8
@@ -218,17 +218,17 @@ class TestHazardZone:
         assert risk == 0.8
 
     def test_risk_outside_radius(self):
-        """Risk outside radius should be zero."""
+        """Rủi ro ngoài bán kính phải bằng không."""
         hazard = HazardZone(
             center_lat=10.7579, center_lon=106.7057,
             radius_km=1.0, risk_level=0.8
         )
-        # Point far away
+        # Điểm xa
         risk = hazard.get_risk_at(10.9, 106.9)
         assert risk == 0.0
 
     def test_risk_inactive_hazard(self):
-        """Inactive hazard should return zero risk."""
+        """Vùng nguy hiểm không hoạt động phải trả về rủi ro bằng không."""
         hazard = HazardZone(
             center_lat=10.7579, center_lon=106.7057,
             radius_km=2.0, risk_level=0.8, is_active=False
@@ -238,10 +238,10 @@ class TestHazardZone:
 
 
 class TestEdge:
-    """Tests for Edge class."""
+    """Kiểm thử cho lớp Edge."""
 
     def test_edge_creation(self):
-        """Test basic edge creation."""
+        """Kiểm tra việc tạo edge cơ bản."""
         edge = Edge(
             id="e1",
             source_id="n1",
@@ -256,7 +256,7 @@ class TestEdge:
         assert edge.road_type == RoadType.PRIMARY
 
     def test_capacity_calculation(self):
-        """Test capacity based on road type and lanes."""
+        """Kiểm tra tính toán sức chứa dựa trên loại đường và số làn."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, road_type=RoadType.PRIMARY, lanes=2
@@ -265,7 +265,7 @@ class TestEdge:
         assert edge.capacity == expected
 
     def test_base_travel_time(self):
-        """Test base travel time calculation."""
+        """Kiểm tra tính toán thời gian di chuyển cơ bản."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=30, max_speed_kmh=60
@@ -273,7 +273,7 @@ class TestEdge:
         assert edge.base_travel_time == 0.5  # 30km / 60km/h = 0.5h
 
     def test_congestion_level(self):
-        """Test congestion level calculation."""
+        """Kiểm tra tính toán mức độ tắc nghẽn."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, road_type=RoadType.PRIMARY, lanes=1
@@ -282,7 +282,7 @@ class TestEdge:
         assert 0.4 < edge.congestion_level < 0.6
 
     def test_blocked_edge_speed(self):
-        """Blocked edge should have zero effective speed."""
+        """Edge bị chặn phải có tốc độ hiệu dụng bằng không."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, is_blocked=True
@@ -290,7 +290,7 @@ class TestEdge:
         assert edge.effective_speed == 0.0
 
     def test_blocked_edge_travel_time(self):
-        """Blocked edge should have infinite travel time."""
+        """Edge bị chặn phải có thời gian di chuyển vô hạn."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, is_blocked=True
@@ -298,7 +298,7 @@ class TestEdge:
         assert edge.current_travel_time == float('inf')
 
     def test_get_cost(self):
-        """Test cost calculation."""
+        """Kiểm tra tính toán chi phí."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, max_speed_kmh=30
@@ -307,7 +307,7 @@ class TestEdge:
         assert cost > 0
 
     def test_blocked_edge_cost(self):
-        """Blocked edge should have infinite cost."""
+        """Edge bị chặn phải có chi phí vô hạn."""
         edge = Edge(
             id="e1", source_id="n1", target_id="n2",
             length_km=1.0, is_blocked=True
@@ -315,7 +315,7 @@ class TestEdge:
         assert edge.get_cost() == float('inf')
 
     def test_add_remove_flow(self):
-        """Test flow management."""
+        """Kiểm tra quản lý lưu lượng."""
         edge = Edge(id="e1", source_id="n1", target_id="n2", length_km=1.0)
         edge.add_flow(100)
         assert edge.current_flow == 100
@@ -325,29 +325,29 @@ class TestEdge:
         assert edge.current_flow == 0
 
     def test_remove_flow_never_negative(self):
-        """Flow should never go negative."""
+        """Lưu lượng không bao giờ âm."""
         edge = Edge(id="e1", source_id="n1", target_id="n2", length_km=1.0)
         edge.current_flow = 50
         edge.remove_flow(100)
         assert edge.current_flow == 0
 
     def test_set_flood_risk_blocks_high_risk(self):
-        """High flood risk should block the road."""
+        """Rủi ro lũ lụt cao phải chặn đường."""
         edge = Edge(id="e1", source_id="n1", target_id="n2", length_km=1.0)
         edge.set_flood_risk(0.95)
         assert edge.is_blocked is True
 
 
 class TestEvacuationNetwork:
-    """Tests for EvacuationNetwork class."""
+    """Kiểm thử cho lớp EvacuationNetwork."""
 
     def test_network_creation(self):
-        """Test empty network creation."""
+        """Kiểm tra việc tạo mạng lưới trống."""
         network = EvacuationNetwork()
         assert len(network) == 0
 
     def test_add_and_get_node(self):
-        """Test adding and retrieving nodes."""
+        """Kiểm tra thêm và lấy node."""
         network = EvacuationNetwork()
         node = Node(id="n1", lat=10.7769, lon=106.7009)
         network.add_node(node)
@@ -357,7 +357,7 @@ class TestEvacuationNetwork:
         assert retrieved.id == "n1"
 
     def test_add_population_zone(self):
-        """Test adding population zones."""
+        """Kiểm tra thêm khu dân cư."""
         network = EvacuationNetwork()
         zone = PopulationZone(
             id="zone1", lat=10.0, lon=106.0, population=10000
@@ -369,7 +369,7 @@ class TestEvacuationNetwork:
         assert zones[0].population == 10000
 
     def test_add_shelter(self):
-        """Test adding shelters."""
+        """Kiểm tra thêm nơi trú ẩn."""
         network = EvacuationNetwork()
         shelter = Shelter(id="s1", lat=10.0, lon=106.0, capacity=1000)
         network.add_node(shelter)
@@ -379,7 +379,7 @@ class TestEvacuationNetwork:
         assert shelters[0].capacity == 1000
 
     def test_add_and_get_edge(self):
-        """Test adding and retrieving edges."""
+        """Kiểm tra thêm và lấy edge."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=10.1, lon=106.1)
@@ -394,7 +394,7 @@ class TestEvacuationNetwork:
         assert retrieved.source_id == "n1"
 
     def test_get_edge_between(self):
-        """Test getting edge between two nodes."""
+        """Kiểm tra lấy edge giữa hai node."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=10.1, lon=106.1)
@@ -409,7 +409,7 @@ class TestEvacuationNetwork:
         assert found.id == "e1"
 
     def test_get_neighbors(self):
-        """Test getting node neighbors."""
+        """Kiểm tra lấy các node láng giềng."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=10.1, lon=106.1)
@@ -429,7 +429,7 @@ class TestEvacuationNetwork:
         assert "n3" in neighbors
 
     def test_add_hazard_zone(self):
-        """Test adding hazard zones."""
+        """Kiểm tra thêm vùng nguy hiểm."""
         network = EvacuationNetwork()
         hazard = HazardZone(
             center_lat=10.7579, center_lon=106.7057,
@@ -441,7 +441,7 @@ class TestEvacuationNetwork:
         assert len(hazards) == 1
 
     def test_get_total_risk_at(self):
-        """Test total risk calculation at a point."""
+        """Kiểm tra tính toán tổng rủi ro tại một điểm."""
         network = EvacuationNetwork()
         hazard = HazardZone(
             center_lat=10.7579, center_lon=106.7057,
@@ -449,16 +449,16 @@ class TestEvacuationNetwork:
         )
         network.add_hazard_zone(hazard)
 
-        # Risk at hazard center
+        # Rủi ro tại tâm vùng nguy hiểm
         risk = network.get_total_risk_at(10.7579, 106.7057)
         assert risk == 0.8
 
-        # Risk far away
+        # Rủi ro xa
         risk_far = network.get_total_risk_at(10.9, 106.9)
         assert risk_far == 0.0
 
     def test_find_nearest_node(self):
-        """Test finding nearest node."""
+        """Kiểm tra tìm node gần nhất."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=10.5, lon=106.5)
@@ -469,19 +469,19 @@ class TestEvacuationNetwork:
         assert nearest.id == "n1"
 
     def test_find_nearest_shelter(self):
-        """Test finding nearest shelter with capacity."""
+        """Kiểm tra tìm nơi trú ẩn gần nhất có sức chứa."""
         network = EvacuationNetwork()
         s1 = Shelter(id="s1", lat=10.0, lon=106.0, capacity=100, current_occupancy=100)
         s2 = Shelter(id="s2", lat=10.1, lon=106.1, capacity=100, current_occupancy=50)
         network.add_node(s1)
         network.add_node(s2)
 
-        # s1 is closer but full, should return s2
+        # s1 gần hơn nhưng đầy, nên trả về s2
         nearest = network.find_nearest_shelter(10.0, 106.0)
         assert nearest.id == "s2"
 
     def test_reset_simulation_state(self):
-        """Test resetting simulation state."""
+        """Kiểm tra đặt lại trạng thái mô phỏng."""
         network = EvacuationNetwork()
         zone = PopulationZone(id="z1", lat=10.0, lon=106.0, population=1000, evacuated=500)
         shelter = Shelter(id="s1", lat=10.1, lon=106.1, capacity=1000, current_occupancy=300)
@@ -499,7 +499,7 @@ class TestEvacuationNetwork:
         assert edge.current_flow == 0
 
     def test_get_stats(self):
-        """Test network statistics."""
+        """Kiểm tra thống kê mạng lưới."""
         network = EvacuationNetwork()
         zone = PopulationZone(id="z1", lat=10.0, lon=106.0, population=10000)
         shelter = Shelter(id="s1", lat=10.1, lon=106.1, capacity=5000)
@@ -519,7 +519,7 @@ class TestEvacuationNetwork:
         assert stats.total_road_length_km == 2.5
 
     def test_get_bounds(self):
-        """Test geographic bounds calculation."""
+        """Kiểm tra tính toán ranh giới địa lý."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=11.0, lon=107.0)
@@ -533,7 +533,7 @@ class TestEvacuationNetwork:
         assert max_lon == 107.0
 
     def test_get_center(self):
-        """Test geographic center calculation."""
+        """Kiểm tra tính toán tâm địa lý."""
         network = EvacuationNetwork()
         n1 = Node(id="n1", lat=10.0, lon=106.0)
         n2 = Node(id="n2", lat=12.0, lon=108.0)
@@ -546,10 +546,10 @@ class TestEvacuationNetwork:
 
 
 class TestNetworkSerialization:
-    """Tests for network serialization."""
+    """Kiểm thử cho việc tuần tự hóa mạng lưới."""
 
     def test_to_dict(self):
-        """Test converting network to dictionary."""
+        """Kiểm tra chuyển đổi mạng lưới sang từ điển."""
         network = EvacuationNetwork()
         zone = PopulationZone(id="z1", lat=10.0, lon=106.0, population=1000)
         shelter = Shelter(id="s1", lat=10.1, lon=106.1, capacity=500)

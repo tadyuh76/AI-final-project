@@ -1,6 +1,6 @@
 """
-Edge model for the evacuation network.
-Represents road segments with capacity, travel time, and risk attributes.
+Mô hình cạnh cho mạng lưới sơ tán.
+Đại diện cho các đoạn đường với các thuộc tính sức chứa, thời gian di chuyển và rủi ro.
 """
 
 from dataclasses import dataclass, field
@@ -9,17 +9,17 @@ from enum import Enum
 
 
 class RoadType(Enum):
-    """Types of roads with different capacities."""
-    MOTORWAY = "motorway"           # Highways - highest capacity
-    TRUNK = "trunk"                  # Major arterial roads
-    PRIMARY = "primary"              # Primary roads
-    SECONDARY = "secondary"          # Secondary roads
-    TERTIARY = "tertiary"            # Tertiary roads
-    RESIDENTIAL = "residential"      # Residential streets
-    UNCLASSIFIED = "unclassified"   # Other roads
+    """Các loại đường với sức chứa khác nhau."""
+    MOTORWAY = "motorway"           # Đường cao tốc - sức chứa cao nhất
+    TRUNK = "trunk"                  # Đường trục chính
+    PRIMARY = "primary"              # Đường cấp một
+    SECONDARY = "secondary"          # Đường cấp hai
+    TERTIARY = "tertiary"            # Đường cấp ba
+    RESIDENTIAL = "residential"      # Đường dân cư
+    UNCLASSIFIED = "unclassified"   # Các đường khác
 
 
-# Capacity in vehicles per hour per lane based on road type
+# Sức chứa theo xe mỗi giờ mỗi làn dựa trên loại đường
 ROAD_CAPACITY = {
     RoadType.MOTORWAY: 2000,
     RoadType.TRUNK: 1500,
@@ -30,7 +30,7 @@ ROAD_CAPACITY = {
     RoadType.UNCLASSIFIED: 300,
 }
 
-# Default speed limits (km/h) by road type
+# Giới hạn tốc độ mặc định (km/h) theo loại đường
 DEFAULT_SPEEDS = {
     RoadType.MOTORWAY: 80,
     RoadType.TRUNK: 60,
@@ -44,53 +44,53 @@ DEFAULT_SPEEDS = {
 
 @dataclass
 class Edge:
-    """Represents a road segment in the network."""
+    """Đại diện cho một đoạn đường trong mạng lưới."""
     id: str
     source_id: str
     target_id: str
-    length_km: float  # Length in kilometers
+    length_km: float  # Chiều dài tính bằng kilômét
     road_type: RoadType = RoadType.UNCLASSIFIED
     lanes: int = 1
     max_speed_kmh: float = 30.0
     name: Optional[str] = None
     is_oneway: bool = False
 
-    # Dynamic state (changes during simulation)
-    current_flow: int = 0  # Current number of vehicles/people on edge
-    flood_risk: float = 0.0  # 0.0 to 1.0, risk from flooding
-    is_blocked: bool = False  # Road completely blocked
+    # Trạng thái động (thay đổi trong quá trình mô phỏng)
+    current_flow: int = 0  # Số lượng phương tiện/người hiện tại trên cạnh
+    flood_risk: float = 0.0  # 0.0 đến 1.0, rủi ro từ lũ lụt
+    is_blocked: bool = False  # Đường bị chặn hoàn toàn
 
-    # Geometry for visualization (list of lat/lon points)
+    # Hình học cho trực quan hóa (danh sách các điểm lat/lon)
     geometry: List[Tuple[float, float]] = field(default_factory=list)
 
     @property
     def capacity(self) -> int:
-        """Maximum flow capacity (vehicles/hour)."""
+        """Sức chứa luồng tối đa (xe/giờ)."""
         base_capacity = ROAD_CAPACITY.get(self.road_type, 300)
         return base_capacity * self.lanes
 
     @property
     def base_travel_time(self) -> float:
-        """Base travel time in hours without congestion."""
+        """Thời gian di chuyển cơ bản tính bằng giờ không có tắc nghẽn."""
         if self.max_speed_kmh <= 0:
             return float('inf')
         return self.length_km / self.max_speed_kmh
 
     @property
     def congestion_level(self) -> float:
-        """Current congestion from 0.0 (free) to 1.0 (jammed)."""
+        """Mức độ tắc nghẽn hiện tại từ 0.0 (thông thoáng) đến 1.0 (tắc nghẽn)."""
         if self.capacity <= 0:
             return 1.0
         return min(1.0, self.current_flow / self.capacity)
 
     @property
     def effective_speed(self) -> float:
-        """Current effective speed considering congestion (km/h)."""
+        """Tốc độ hiệu quả hiện tại tính đến tắc nghẽn (km/h)."""
         if self.is_blocked:
             return 0.0
 
-        # BPR (Bureau of Public Roads) function for speed reduction
-        # Speed = FreeFlowSpeed / (1 + alpha * (flow/capacity)^beta)
+        # Hàm BPR (Bureau of Public Roads) để giảm tốc độ
+        # Tốc độ = TốcĐộTựDo / (1 + alpha * (luồng/sứcChứa)^beta)
         alpha = 0.15
         beta = 4.0
         congestion_factor = 1 + alpha * (self.congestion_level ** beta)
@@ -98,7 +98,7 @@ class Edge:
 
     @property
     def current_travel_time(self) -> float:
-        """Current travel time in hours considering congestion."""
+        """Thời gian di chuyển hiện tại tính bằng giờ có tính đến tắc nghẽn."""
         if self.is_blocked:
             return float('inf')
 
@@ -109,63 +109,63 @@ class Edge:
 
     def get_cost(self, risk_weight: float = 0.3) -> float:
         """
-        Calculate edge cost for pathfinding.
+        Tính chi phí cạnh cho tìm đường.
 
         Args:
-            risk_weight: Weight for flood risk (0.0 to 1.0)
+            risk_weight: Trọng số cho rủi ro lũ lụt (0.0 đến 1.0)
 
         Returns:
-            Combined cost considering time and risk.
+            Chi phí kết hợp xem xét thời gian và rủi ro.
         """
         if self.is_blocked:
             return float('inf')
 
         time_cost = self.current_travel_time
-        risk_cost = self.flood_risk * self.length_km  # Risk weighted by distance
+        risk_cost = self.flood_risk * self.length_km  # Rủi ro được cân nhắc theo khoảng cách
 
         return time_cost + risk_weight * risk_cost
 
     def can_accept_flow(self, amount: int = 1) -> bool:
-        """Check if edge can accept additional flow."""
+        """Kiểm tra xem cạnh có thể chấp nhận thêm luồng hay không."""
         if self.is_blocked:
             return False
-        # Allow some overflow (up to 150% capacity) but with penalty
+        # Cho phép tràn một chút (lên đến 150% sức chứa) nhưng có phạt
         return self.current_flow + amount <= self.capacity * 1.5
 
     def add_flow(self, amount: int) -> None:
-        """Add flow to the edge."""
+        """Thêm luồng vào cạnh."""
         self.current_flow += amount
 
     def remove_flow(self, amount: int) -> None:
-        """Remove flow from the edge."""
+        """Loại bỏ luồng khỏi cạnh."""
         self.current_flow = max(0, self.current_flow - amount)
 
     def reset_flow(self) -> None:
-        """Reset flow to zero."""
+        """Đặt lại luồng về không."""
         self.current_flow = 0
 
     def set_flood_risk(self, risk: float) -> None:
-        """Set flood risk level."""
+        """Đặt mức độ rủi ro lũ lụt."""
         self.flood_risk = max(0.0, min(1.0, risk))
-        # High flood risk blocks the road
+        # Rủi ro lũ lụt cao chặn đường
         if risk > 0.9:
             self.is_blocked = True
 
     def block(self) -> None:
-        """Block the road."""
+        """Chặn đường."""
         self.is_blocked = True
 
     def unblock(self) -> None:
-        """Unblock the road."""
+        """Mở chặn đường."""
         self.is_blocked = False
         if self.flood_risk > 0.9:
-            self.flood_risk = 0.5  # Reduce risk when unblocking
+            self.flood_risk = 0.5  # Giảm rủi ro khi mở chặn
 
     @classmethod
     def from_osm_data(cls, edge_id: str, source: str, target: str,
                       data: dict) -> 'Edge':
-        """Create an Edge from OSM edge data."""
-        # Parse road type
+        """Tạo một Edge từ dữ liệu cạnh OSM."""
+        # Phân tích loại đường
         highway = data.get('highway', 'unclassified')
         if isinstance(highway, list):
             highway = highway[0]
@@ -185,11 +185,11 @@ class Edge:
         }
         road_type = road_type_map.get(highway, RoadType.UNCLASSIFIED)
 
-        # Parse length (meters to km)
+        # Phân tích chiều dài (từ mét sang km)
         length_m = data.get('length', 100)
         length_km = length_m / 1000.0
 
-        # Parse lanes
+        # Phân tích số làn
         lanes = data.get('lanes', 1)
         if isinstance(lanes, list):
             lanes = int(lanes[0])
@@ -197,13 +197,13 @@ class Edge:
             lanes = int(lanes)
         lanes = max(1, lanes)
 
-        # Parse speed
+        # Phân tích tốc độ
         maxspeed = data.get('maxspeed', None)
         if maxspeed:
             if isinstance(maxspeed, list):
                 maxspeed = maxspeed[0]
             if isinstance(maxspeed, str):
-                # Remove 'km/h' or 'mph' and convert
+                # Loại bỏ 'km/h' hoặc 'mph' và chuyển đổi
                 maxspeed = maxspeed.replace('km/h', '').replace('mph', '').strip()
                 try:
                     maxspeed = float(maxspeed)
@@ -212,17 +212,17 @@ class Edge:
         else:
             maxspeed = DEFAULT_SPEEDS.get(road_type, 30)
 
-        # Parse name
+        # Phân tích tên
         name = data.get('name', None)
         if isinstance(name, list):
             name = name[0]
 
-        # Parse oneway
+        # Phân tích một chiều
         oneway = data.get('oneway', False)
         if isinstance(oneway, str):
             oneway = oneway.lower() in ('yes', 'true', '1')
 
-        # Parse geometry if available
+        # Phân tích hình học nếu có
         geometry = []
         if 'geometry' in data:
             try:

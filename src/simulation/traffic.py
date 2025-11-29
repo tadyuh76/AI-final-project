@@ -1,11 +1,11 @@
 """
-Traffic Flow Model for evacuation simulation.
+Mô hình Dòng chảy Giao thông cho mô phỏng sơ tán.
 
-Implements traffic flow dynamics including:
-- BPR (Bureau of Public Roads) speed-flow relationship
-- Queue formation and dissipation
-- Intersection delays
-- Dynamic capacity reduction from hazards
+Triển khai động lực dòng chảy giao thông bao gồm:
+- Mối quan hệ tốc độ-dòng chảy BPR (Bureau of Public Roads)
+- Hình thành và tiêu tán hàng đợi
+- Độ trễ giao lộ
+- Giảm công suất động từ các mối nguy hiểm
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -18,7 +18,7 @@ from ..models.edge import Edge, RoadType
 
 
 class TrafficState(Enum):
-    """Traffic flow states."""
+    """Các trạng thái dòng chảy giao thông."""
     FREE_FLOW = "free_flow"
     SYNCHRONIZED = "synchronized"
     CONGESTED = "congested"
@@ -27,44 +27,44 @@ class TrafficState(Enum):
 
 @dataclass
 class TrafficConfig:
-    """Configuration for traffic model parameters."""
-    # BPR function parameters
-    bpr_alpha: float = 0.15  # BPR alpha parameter
-    bpr_beta: float = 4.0  # BPR beta parameter (power)
+    """Cấu hình cho các tham số mô hình giao thông."""
+    # Tham số hàm BPR
+    bpr_alpha: float = 0.15  # Tham số alpha BPR
+    bpr_beta: float = 4.0  # Tham số beta BPR (lũy thừa)
 
-    # Capacity factors
-    hazard_capacity_reduction: float = 0.5  # Capacity reduction in hazard zones
-    rain_capacity_reduction: float = 0.2  # Capacity reduction during rain
-    night_capacity_reduction: float = 0.15  # Capacity reduction at night
+    # Hệ số công suất
+    hazard_capacity_reduction: float = 0.5  # Giảm công suất trong vùng nguy hiểm
+    rain_capacity_reduction: float = 0.2  # Giảm công suất khi mưa
+    night_capacity_reduction: float = 0.15  # Giảm công suất vào ban đêm
 
-    # Queue parameters
-    queue_discharge_rate: float = 1800  # Vehicles per hour per lane
-    max_queue_length: int = 500  # Maximum queue before spillback
+    # Tham số hàng đợi
+    queue_discharge_rate: float = 1800  # Xe mỗi giờ mỗi làn
+    max_queue_length: int = 500  # Độ dài hàng đợi tối đa trước khi tràn ngược
 
-    # Intersection delays (hours)
-    signalized_delay: float = 0.01  # ~36 seconds average
-    unsignalized_delay: float = 0.005  # ~18 seconds average
+    # Độ trễ giao lộ (giờ)
+    signalized_delay: float = 0.01  # ~36 giây trung bình
+    unsignalized_delay: float = 0.005  # ~18 giây trung bình
 
-    # Person-to-vehicle conversion
-    persons_per_vehicle: float = 3.0  # Average occupancy during evacuation
+    # Chuyển đổi người sang phương tiện
+    persons_per_vehicle: float = 3.0  # Mức độ sử dụng trung bình trong quá trình sơ tán
 
 
 @dataclass
 class EdgeTrafficState:
-    """Traffic state for an individual edge."""
+    """Trạng thái giao thông cho một cạnh cá nhân."""
     edge_id: str
-    current_flow: int = 0  # Current flow (persons)
-    queue_length: int = 0  # Waiting queue at entry
-    travel_time: float = 0.0  # Current travel time (hours)
-    speed: float = 0.0  # Current speed (km/h)
-    density: float = 0.0  # Vehicles per km
+    current_flow: int = 0  # Dòng chảy hiện tại (người)
+    queue_length: int = 0  # Hàng đợi chờ ở lối vào
+    travel_time: float = 0.0  # Thời gian di chuyển hiện tại (giờ)
+    speed: float = 0.0  # Tốc độ hiện tại (km/h)
+    density: float = 0.0  # Xe mỗi km
     state: TrafficState = TrafficState.FREE_FLOW
-    capacity_factor: float = 1.0  # Effective capacity multiplier
+    capacity_factor: float = 1.0  # Hệ số nhân công suất hiệu quả
 
 
 @dataclass
 class NetworkTrafficState:
-    """Aggregate traffic state for the network."""
+    """Trạng thái giao thông tổng hợp cho mạng lưới."""
     total_vehicles: int = 0
     total_in_queue: int = 0
     average_speed: float = 0.0
@@ -75,34 +75,34 @@ class NetworkTrafficState:
 
 class TrafficFlowModel:
     """
-    Traffic flow simulation model.
+    Mô hình mô phỏng dòng chảy giao thông.
 
-    Implements macroscopic traffic flow using:
-    - BPR function for speed-flow relationship
-    - First-order kinematic wave model for propagation
-    - Queue-based intersection modeling
+    Triển khai dòng chảy giao thông vĩ mô sử dụng:
+    - Hàm BPR cho mối quan hệ tốc độ-dòng chảy
+    - Mô hình sóng động học bậc nhất cho lan truyền
+    - Mô hình hóa giao lộ dựa trên hàng đợi
     """
 
     def __init__(self, network: EvacuationNetwork,
                  config: Optional[TrafficConfig] = None):
         """
-        Initialize traffic model.
+        Khởi tạo mô hình giao thông.
 
         Args:
-            network: The evacuation network
-            config: Traffic configuration
+            network: Mạng lưới sơ tán
+            config: Cấu hình giao thông
         """
         self.network = network
         self.config = config or TrafficConfig()
 
-        # Traffic state per edge
+        # Trạng thái giao thông mỗi cạnh
         self._edge_states: Dict[str, EdgeTrafficState] = {}
 
-        # Initialize edge states
+        # Khởi tạo trạng thái cạnh
         self._initialize_edge_states()
 
     def _initialize_edge_states(self) -> None:
-        """Initialize traffic state for all edges."""
+        """Khởi tạo trạng thái giao thông cho tất cả các cạnh."""
         for edge in self.network.get_edges():
             self._edge_states[edge.id] = EdgeTrafficState(
                 edge_id=edge.id,
@@ -111,105 +111,105 @@ class TrafficFlowModel:
             )
 
     def reset(self) -> None:
-        """Reset traffic state."""
+        """Đặt lại trạng thái giao thông."""
         self._initialize_edge_states()
 
     def update(self, time_step_hours: float) -> NetworkTrafficState:
         """
-        Update traffic state for one time step.
+        Cập nhật trạng thái giao thông cho một bước thời gian.
 
         Args:
-            time_step_hours: Time step duration in hours
+            time_step_hours: Thời lượng bước thời gian tính bằng giờ
 
         Returns:
-            Updated network traffic state
+            Trạng thái giao thông mạng lưới đã cập nhật
         """
-        # Update each edge
+        # Cập nhật từng cạnh
         for edge in self.network.get_edges():
             state = self._edge_states.get(edge.id)
             if state:
                 self._update_edge_state(edge, state, time_step_hours)
 
-        # Process queues and spillback
+        # Xử lý hàng đợi và tràn ngược
         self._process_queues(time_step_hours)
 
-        # Calculate network-wide metrics
+        # Tính toán chỉ số toàn mạng lưới
         return self._calculate_network_state()
 
     def _update_edge_state(self, edge: Edge, state: EdgeTrafficState,
                            time_step_hours: float) -> None:
-        """Update traffic state for a single edge."""
-        # Get current flow from edge
+        """Cập nhật trạng thái giao thông cho một cạnh đơn."""
+        # Lấy dòng chảy hiện tại từ cạnh
         state.current_flow = edge.current_flow
 
-        # Calculate effective capacity
+        # Tính toán công suất hiệu quả
         base_capacity = edge.capacity
         capacity_factor = self._calculate_capacity_factor(edge)
         state.capacity_factor = capacity_factor
         effective_capacity = base_capacity * capacity_factor
 
-        # Convert persons to vehicles
+        # Chuyển đổi người sang phương tiện
         vehicle_flow = state.current_flow / self.config.persons_per_vehicle
 
-        # Calculate volume-to-capacity ratio
+        # Tính toán tỷ lệ lưu lượng trên công suất
         if effective_capacity > 0:
             vc_ratio = vehicle_flow / effective_capacity
         else:
             vc_ratio = 1.0
 
-        # Apply BPR function for travel time
+        # Áp dụng hàm BPR cho thời gian di chuyển
         base_time = edge.base_travel_time
         state.travel_time = self._bpr_travel_time(base_time, vc_ratio)
 
-        # Calculate speed
+        # Tính toán tốc độ
         if state.travel_time > 0:
             state.speed = edge.length_km / state.travel_time
         else:
             state.speed = edge.max_speed_kmh
 
-        # Calculate density (vehicles per km)
+        # Tính toán mật độ (xe mỗi km)
         if edge.length_km > 0:
             state.density = vehicle_flow / (edge.length_km * edge.lanes)
         else:
             state.density = 0
 
-        # Determine traffic state
+        # Xác định trạng thái giao thông
         state.state = self._determine_traffic_state(vc_ratio)
 
     def _bpr_travel_time(self, free_flow_time: float,
                          vc_ratio: float) -> float:
         """
-        Calculate travel time using BPR function.
+        Tính toán thời gian di chuyển sử dụng hàm BPR.
 
         BPR: t = t0 * (1 + alpha * (v/c)^beta)
 
         Args:
-            free_flow_time: Free-flow travel time
-            vc_ratio: Volume-to-capacity ratio
+            free_flow_time: Thời gian di chuyển dòng chảy tự do
+            vc_ratio: Tỷ lệ lưu lượng trên công suất
 
         Returns:
-            Congested travel time
+            Thời gian di chuyển có tắc nghẽn
         """
         return free_flow_time * (
             1 + self.config.bpr_alpha * (vc_ratio ** self.config.bpr_beta)
         )
 
     def _calculate_capacity_factor(self, edge: Edge) -> float:
-        """Calculate effective capacity factor based on conditions."""
+        """Tính toán hệ số công suất hiệu quả dựa trên điều kiện."""
         factor = 1.0
 
-        # Reduce capacity in hazard zones
+        # Giảm công suất trong vùng nguy hiểm
         if edge.flood_risk > 0:
             factor *= (1 - edge.flood_risk * self.config.hazard_capacity_reduction)
 
-        # Blocked edges have zero capacity
+        # Các cạnh bị chặn có công suất bằng không
         if edge.is_blocked:
             return 0.0
 
-        return max(0.1, factor)  # Minimum 10% capacity
+        return max(0.1, factor)  # Công suất tối thiểu 10%
 
     def _determine_traffic_state(self, vc_ratio: float) -> TrafficState:
-        """Determine traffic state based on V/C ratio."""
+        """Xác định trạng thái giao thông dựa trên tỷ lệ V/C."""
         if vc_ratio < 0.5:
             return TrafficState.FREE_FLOW
         elif vc_ratio < 0.8:
@@ -220,18 +220,18 @@ class TrafficFlowModel:
             return TrafficState.GRIDLOCK
 
     def _process_queues(self, time_step_hours: float) -> None:
-        """Process queue formation and dissipation."""
+        """Xử lý hình thành và tiêu tán hàng đợi."""
         for edge_id, state in self._edge_states.items():
             edge = self.network.get_edge(edge_id)
             if not edge:
                 continue
 
-            # Queue forms when demand exceeds capacity
+            # Hàng đợi hình thành khi nhu cầu vượt quá công suất
             effective_capacity = edge.capacity * state.capacity_factor
             demand = edge.current_flow / self.config.persons_per_vehicle
 
             if demand > effective_capacity:
-                # Queue growth
+                # Tăng trưởng hàng đợi
                 excess = demand - effective_capacity
                 queue_growth = int(excess * time_step_hours)
                 state.queue_length = min(
@@ -239,7 +239,7 @@ class TrafficFlowModel:
                     self.config.max_queue_length
                 )
             else:
-                # Queue dissipation
+                # Tiêu tán hàng đợi
                 discharge = int(
                     self.config.queue_discharge_rate *
                     edge.lanes *
@@ -249,7 +249,7 @@ class TrafficFlowModel:
                 state.queue_length = max(0, state.queue_length - discharge)
 
     def _calculate_network_state(self) -> NetworkTrafficState:
-        """Calculate aggregate network traffic state."""
+        """Tính toán trạng thái giao thông mạng lưới tổng hợp."""
         network_state = NetworkTrafficState()
 
         total_flow = 0
@@ -267,7 +267,7 @@ class TrafficFlowModel:
             total_flow += state.current_flow
             total_queue += state.queue_length
 
-            # Weight speed by edge length
+            # Trọng số tốc độ theo độ dài cạnh
             total_speed_weighted += state.speed * edge.length_km
             total_length += edge.length_km
 
@@ -291,14 +291,14 @@ class TrafficFlowModel:
         return network_state
 
     def get_edge_travel_time(self, edge_id: str) -> float:
-        """Get current travel time for an edge."""
+        """Lấy thời gian di chuyển hiện tại cho một cạnh."""
         state = self._edge_states.get(edge_id)
         if state:
             return state.travel_time
         return float('inf')
 
     def get_edge_speed(self, edge_id: str) -> float:
-        """Get current speed on an edge."""
+        """Lấy tốc độ hiện tại trên một cạnh."""
         state = self._edge_states.get(edge_id)
         if state:
             return state.speed
@@ -306,13 +306,13 @@ class TrafficFlowModel:
 
     def get_route_travel_time(self, path: List[str]) -> float:
         """
-        Calculate total travel time along a route.
+        Tính toán tổng thời gian di chuyển dọc theo tuyến đường.
 
         Args:
-            path: List of node IDs
+            path: Danh sách các ID node
 
         Returns:
-            Total travel time in hours
+            Tổng thời gian di chuyển tính bằng giờ
         """
         if len(path) < 2:
             return 0.0
@@ -324,7 +324,7 @@ class TrafficFlowModel:
                 state = self._edge_states.get(edge.id)
                 if state:
                     total_time += state.travel_time
-                    # Add intersection delay
+                    # Thêm độ trễ giao lộ
                     total_time += self.config.signalized_delay
                 else:
                     total_time += edge.base_travel_time
@@ -333,10 +333,10 @@ class TrafficFlowModel:
 
     def get_congestion_map(self) -> Dict[str, float]:
         """
-        Get congestion levels for all edges.
+        Lấy mức độ tắc nghẽn cho tất cả các cạnh.
 
         Returns:
-            Dictionary of edge_id -> congestion level (0-1)
+            Từ điển edge_id -> mức độ tắc nghẽn (0-1)
         """
         congestion_map = {}
         for edge_id, state in self._edge_states.items():
@@ -347,11 +347,11 @@ class TrafficFlowModel:
 
     def apply_incident(self, edge_id: str, capacity_reduction: float) -> None:
         """
-        Apply an incident (accident, breakdown) to an edge.
+        Áp dụng sự cố (tai nạn, hỏng hóc) cho một cạnh.
 
         Args:
-            edge_id: Edge to affect
-            capacity_reduction: Capacity reduction factor (0-1)
+            edge_id: Cạnh bị ảnh hưởng
+            capacity_reduction: Hệ số giảm công suất (0-1)
         """
         edge = self.network.get_edge(edge_id)
         if edge:
@@ -360,7 +360,7 @@ class TrafficFlowModel:
                 state.capacity_factor *= (1 - capacity_reduction)
 
     def clear_incident(self, edge_id: str) -> None:
-        """Clear an incident from an edge."""
+        """Xóa sự cố khỏi một cạnh."""
         state = self._edge_states.get(edge_id)
         if state:
             state.capacity_factor = 1.0
@@ -368,27 +368,27 @@ class TrafficFlowModel:
 
 @dataclass
 class FlowAssignment:
-    """Flow assignment for network equilibrium."""
+    """Phân công dòng chảy cho cân bằng mạng lưới."""
     edge_id: str
-    flow: float  # Vehicles per hour
-    travel_time: float  # Current travel time
+    flow: float  # Xe mỗi giờ
+    travel_time: float  # Thời gian di chuyển hiện tại
 
 
 class TrafficAssignment:
     """
-    Traffic assignment model for equilibrium analysis.
+    Mô hình phân công giao thông cho phân tích cân bằng.
 
-    Implements basic user equilibrium using Method of Successive Averages (MSA).
+    Triển khai cân bằng người dùng cơ bản sử dụng Phương pháp Trung bình Liên tiếp (MSA).
     """
 
     def __init__(self, network: EvacuationNetwork,
                  config: Optional[TrafficConfig] = None):
         """
-        Initialize traffic assignment model.
+        Khởi tạo mô hình phân công giao thông.
 
         Args:
-            network: The evacuation network
-            config: Traffic configuration
+            network: Mạng lưới sơ tán
+            config: Cấu hình giao thông
         """
         self.network = network
         self.config = config or TrafficConfig()
@@ -397,34 +397,34 @@ class TrafficAssignment:
                     max_iterations: int = 50,
                     convergence_threshold: float = 0.01) -> Dict[str, float]:
         """
-        Assign traffic flow using Method of Successive Averages.
+        Phân công dòng chảy giao thông sử dụng Phương pháp Trung bình Liên tiếp.
 
         Args:
-            od_matrix: Origin-destination demand matrix {(origin_id, dest_id): flow}
-            max_iterations: Maximum iterations for convergence
-            convergence_threshold: Convergence criterion
+            od_matrix: Ma trận nhu cầu xuất phát-đích {(origin_id, dest_id): flow}
+            max_iterations: Số lần lặp tối đa để hội tụ
+            convergence_threshold: Tiêu chí hội tụ
 
         Returns:
-            Dictionary of edge_id -> assigned flow
+            Từ điển edge_id -> dòng chảy được phân công
         """
-        # Initialize with all-or-nothing assignment
+        # Khởi tạo với phân công tất cả hoặc không
         edge_flows: Dict[str, float] = {}
 
         for iteration in range(max_iterations):
-            # Calculate current travel times
+            # Tính toán thời gian di chuyển hiện tại
             travel_times = self._calculate_travel_times(edge_flows)
 
-            # All-or-nothing assignment with current times
+            # Phân công tất cả hoặc không với thời gian hiện tại
             new_flows = self._all_or_nothing_assignment(od_matrix, travel_times)
 
-            # MSA averaging
+            # Tính trung bình MSA
             alpha = 1.0 / (iteration + 1)
             for edge_id in set(edge_flows.keys()) | set(new_flows.keys()):
                 old_flow = edge_flows.get(edge_id, 0.0)
                 new_flow = new_flows.get(edge_id, 0.0)
                 edge_flows[edge_id] = old_flow + alpha * (new_flow - old_flow)
 
-            # Check convergence
+            # Kiểm tra hội tụ
             if iteration > 0:
                 gap = self._calculate_gap(edge_flows, new_flows)
                 if gap < convergence_threshold:
@@ -434,7 +434,7 @@ class TrafficAssignment:
 
     def _calculate_travel_times(self,
                                 edge_flows: Dict[str, float]) -> Dict[str, float]:
-        """Calculate travel times for given flows."""
+        """Tính toán thời gian di chuyển cho các dòng chảy đã cho."""
         travel_times = {}
         for edge in self.network.get_edges():
             flow = edge_flows.get(edge.id, 0.0)
@@ -445,7 +445,7 @@ class TrafficAssignment:
             else:
                 vc_ratio = 1.0
 
-            # BPR function
+            # Hàm BPR
             travel_times[edge.id] = edge.base_travel_time * (
                 1 + self.config.bpr_alpha * (vc_ratio ** self.config.bpr_beta)
             )
@@ -456,15 +456,15 @@ class TrafficAssignment:
             self,
             od_matrix: Dict[Tuple[str, str], float],
             travel_times: Dict[str, float]) -> Dict[str, float]:
-        """Perform all-or-nothing assignment using shortest paths."""
+        """Thực hiện phân công tất cả hoặc không sử dụng đường đi ngắn nhất."""
         edge_flows: Dict[str, float] = {}
 
         for (origin, destination), demand in od_matrix.items():
-            # Find shortest path using current travel times
+            # Tìm đường đi ngắn nhất sử dụng thời gian di chuyển hiện tại
             path = self._find_shortest_path(origin, destination, travel_times)
 
             if path:
-                # Assign all demand to this path
+                # Phân công tất cả nhu cầu cho đường đi này
                 for i in range(len(path) - 1):
                     edge = self.network.get_edge_between(path[i], path[i + 1])
                     if edge:
@@ -474,7 +474,7 @@ class TrafficAssignment:
 
     def _find_shortest_path(self, origin: str, destination: str,
                            travel_times: Dict[str, float]) -> Optional[List[str]]:
-        """Find shortest path using Dijkstra's algorithm."""
+        """Tìm đường đi ngắn nhất sử dụng thuật toán Dijkstra."""
         import heapq
 
         distances = {origin: 0.0}
@@ -490,7 +490,7 @@ class TrafficAssignment:
             visited.add(node)
 
             if node == destination:
-                # Reconstruct path
+                # Tái tạo đường đi
                 path = [destination]
                 current = destination
                 while current in predecessors:
@@ -516,7 +516,7 @@ class TrafficAssignment:
 
     def _calculate_gap(self, old_flows: Dict[str, float],
                        new_flows: Dict[str, float]) -> float:
-        """Calculate relative gap between flow assignments."""
+        """Tính toán khoảng cách tương đối giữa các phân công dòng chảy."""
         total_diff = 0.0
         total_flow = 0.0
 

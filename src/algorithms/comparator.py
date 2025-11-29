@@ -1,8 +1,8 @@
 """
-Algorithm Comparator for benchmarking and comparing evacuation algorithms.
+Bộ so sánh thuật toán để đánh giá và so sánh các thuật toán sơ tán.
 
-Provides side-by-side comparison of GBFS, GWO, and Hybrid algorithms
-with detailed metrics and visualization data.
+Cung cấp so sánh song song của các thuật toán GBFS, GWO và Hybrid
+với các chỉ số chi tiết và dữ liệu trực quan hóa.
 """
 
 from typing import Dict, List, Optional, Tuple, Any, Callable
@@ -22,7 +22,7 @@ from ..models.network import EvacuationNetwork
 
 @dataclass
 class ComparisonResult:
-    """Results of algorithm comparison."""
+    """Kết quả so sánh thuật toán."""
     algorithms: List[AlgorithmType] = field(default_factory=list)
     plans: Dict[AlgorithmType, EvacuationPlan] = field(default_factory=dict)
     metrics: Dict[AlgorithmType, AlgorithmMetrics] = field(default_factory=dict)
@@ -31,7 +31,7 @@ class ComparisonResult:
     winner_score: float = 0.0
 
     def get_metric_comparison(self, metric_name: str) -> Dict[AlgorithmType, float]:
-        """Get a specific metric across all algorithms."""
+        """Lấy một chỉ số cụ thể qua tất cả các thuật toán."""
         result = {}
         for algo, m in self.metrics.items():
             value = getattr(m, metric_name, None)
@@ -40,14 +40,14 @@ class ComparisonResult:
         return result
 
     def get_convergence_data(self) -> Dict[AlgorithmType, List[float]]:
-        """Get convergence history for all algorithms."""
+        """Lấy lịch sử hội tụ cho tất cả các thuật toán."""
         return {
             algo: m.convergence_history
             for algo, m in self.metrics.items()
         }
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
+        """Chuyển đổi sang từ điển để tuần tự hóa."""
         return {
             'algorithms': [a.value for a in self.algorithms],
             'metrics': {a.value: m.to_dict() for a, m in self.metrics.items()},
@@ -57,35 +57,35 @@ class ComparisonResult:
         }
 
     def to_json(self) -> str:
-        """Convert to JSON string."""
+        """Chuyển đổi sang chuỗi JSON."""
         return json.dumps(self.to_dict(), indent=2)
 
 
 class AlgorithmComparator:
     """
-    Compares multiple evacuation optimization algorithms.
+    So sánh nhiều thuật toán tối ưu hóa sơ tán.
 
-    Runs each algorithm on the same network and compares results
-    across multiple metrics.
+    Chạy từng thuật toán trên cùng một mạng lưới và so sánh kết quả
+    qua nhiều chỉ số.
     """
 
-    # Metric weights for overall scoring (sum to 1.0)
+    # Trọng số chỉ số cho tính điểm tổng thể (tổng là 1.0)
     METRIC_WEIGHTS = {
-        'execution_time': 0.15,     # Lower is better
-        'final_cost': 0.25,         # Lower is better
-        'coverage_rate': 0.25,      # Higher is better
-        'average_path_length': 0.10, # Lower is better (efficiency)
-        'routes_found': 0.10,       # Higher is better
-        'evacuees_covered': 0.15    # Higher is better
+        'execution_time': 0.15,     # Thấp hơn là tốt hơn
+        'final_cost': 0.25,         # Thấp hơn là tốt hơn
+        'coverage_rate': 0.25,      # Cao hơn là tốt hơn
+        'average_path_length': 0.10, # Thấp hơn là tốt hơn (hiệu quả)
+        'routes_found': 0.10,       # Cao hơn là tốt hơn
+        'evacuees_covered': 0.15    # Cao hơn là tốt hơn
     }
 
     def __init__(self, network: EvacuationNetwork, config: Optional[AlgorithmConfig] = None):
         """
-        Initialize comparator.
+        Khởi tạo bộ so sánh.
 
         Args:
-            network: The evacuation network to test on
-            config: Shared algorithm configuration
+            network: Mạng lưới sơ tán để kiểm tra
+            config: Cấu hình thuật toán chung
         """
         self.network = network
         self.config = config or AlgorithmConfig()
@@ -93,7 +93,7 @@ class AlgorithmComparator:
 
     def set_progress_callback(self, callback: Callable[[str, int, float], None]) -> None:
         """
-        Set callback for progress updates.
+        Đặt callback cho các cập nhật tiến trình.
 
         Args:
             callback: Function(algorithm_name, iteration, cost)
@@ -102,30 +102,30 @@ class AlgorithmComparator:
 
     def compare_all(self) -> ComparisonResult:
         """
-        Run all three algorithms and compare results.
+        Chạy cả ba thuật toán và so sánh kết quả.
 
         Returns:
-            ComparisonResult with all metrics and rankings
+            ComparisonResult với tất cả các chỉ số và xếp hạng
         """
         return self.compare([AlgorithmType.GBFS, AlgorithmType.GWO, AlgorithmType.HYBRID])
 
     def compare(self, algorithms: List[AlgorithmType]) -> ComparisonResult:
         """
-        Compare specified algorithms.
+        So sánh các thuật toán được chỉ định.
 
         Args:
-            algorithms: List of algorithm types to compare
+            algorithms: Danh sách các loại thuật toán để so sánh
 
         Returns:
-            ComparisonResult with metrics and rankings
+            ComparisonResult với các chỉ số và xếp hạng
         """
         result = ComparisonResult(algorithms=algorithms)
 
         for algo_type in algorithms:
-            # Reset network state before each run
+            # Đặt lại trạng thái mạng lưới trước mỗi lần chạy
             self.network.reset_simulation_state()
 
-            # Create and run algorithm
+            # Tạo và chạy thuật toán
             algorithm = self._create_algorithm(algo_type)
 
             if self._progress_callback:
@@ -140,16 +140,16 @@ class AlgorithmComparator:
             result.plans[algo_type] = plan
             result.metrics[algo_type] = metrics
 
-        # Calculate rankings
+        # Tính toán xếp hạng
         result.rankings = self._calculate_rankings(result.metrics)
 
-        # Determine overall winner
+        # Xác định người chiến thắng tổng thể
         result.winner, result.winner_score = self._calculate_winner(result.metrics)
 
         return result
 
     def _create_algorithm(self, algo_type: AlgorithmType) -> BaseAlgorithm:
-        """Create an algorithm instance of the specified type."""
+        """Tạo một thể hiện thuật toán của loại được chỉ định."""
         if algo_type == AlgorithmType.GBFS:
             return GreedyBestFirstSearch(self.network, self.config)
         elif algo_type == AlgorithmType.GWO:
@@ -157,22 +157,22 @@ class AlgorithmComparator:
         elif algo_type == AlgorithmType.HYBRID:
             return HybridGBFSGWO(self.network, self.config)
         else:
-            raise ValueError(f"Unknown algorithm type: {algo_type}")
+            raise ValueError(f"Loại thuật toán không xác định: {algo_type}")
 
     def _calculate_rankings(self,
                            metrics: Dict[AlgorithmType, AlgorithmMetrics]) -> Dict[str, List[AlgorithmType]]:
         """
-        Calculate rankings for each metric.
+        Tính toán xếp hạng cho từng chỉ số.
 
         Args:
-            metrics: Algorithm metrics
+            metrics: Các chỉ số thuật toán
 
         Returns:
-            Dictionary mapping metric names to ranked algorithm lists
+            Từ điển ánh xạ tên chỉ số tới danh sách thuật toán được xếp hạng
         """
         rankings = {}
 
-        # Metrics where lower is better
+        # Các chỉ số mà thấp hơn là tốt hơn
         lower_is_better = ['execution_time', 'final_cost', 'average_path_length']
 
         for metric_name in self.METRIC_WEIGHTS.keys():
@@ -182,11 +182,11 @@ class AlgorithmComparator:
                 if value is not None:
                     values.append((algo, value))
 
-            # Sort appropriately
+            # Sắp xếp phù hợp
             if metric_name in lower_is_better:
-                values.sort(key=lambda x: x[1])  # Ascending
+                values.sort(key=lambda x: x[1])  # Tăng dần
             else:
-                values.sort(key=lambda x: -x[1])  # Descending
+                values.sort(key=lambda x: -x[1])  # Giảm dần
 
             rankings[metric_name] = [algo for algo, _ in values]
 
@@ -195,21 +195,21 @@ class AlgorithmComparator:
     def _calculate_winner(self,
                          metrics: Dict[AlgorithmType, AlgorithmMetrics]) -> Tuple[Optional[AlgorithmType], float]:
         """
-        Calculate overall winner based on weighted scores.
+        Tính toán người chiến thắng tổng thể dựa trên điểm số có trọng số.
 
         Args:
-            metrics: Algorithm metrics
+            metrics: Các chỉ số thuật toán
 
         Returns:
-            Tuple of (winner algorithm type, score)
+            Tuple của (loại thuật toán chiến thắng, điểm số)
         """
         if not metrics:
             return None, 0.0
 
-        # Normalize metrics for fair comparison
+        # Chuẩn hóa các chỉ số để so sánh công bằng
         normalized = self._normalize_metrics(metrics)
 
-        # Calculate weighted scores
+        # Tính toán điểm số có trọng số
         scores = {}
         for algo in metrics.keys():
             score = 0.0
@@ -218,20 +218,20 @@ class AlgorithmComparator:
                     score += weight * normalized[metric_name][algo]
             scores[algo] = score
 
-        # Find winner
+        # Tìm người chiến thắng
         winner = max(scores.keys(), key=lambda a: scores[a])
         return winner, scores[winner]
 
     def _normalize_metrics(self,
                           metrics: Dict[AlgorithmType, AlgorithmMetrics]) -> Dict[str, Dict[AlgorithmType, float]]:
         """
-        Normalize metrics to 0-1 range for fair comparison.
+        Chuẩn hóa các chỉ số về phạm vi 0-1 để so sánh công bằng.
 
         Args:
-            metrics: Raw algorithm metrics
+            metrics: Các chỉ số thuật toán thô
 
         Returns:
-            Normalized metrics dictionary
+            Từ điển các chỉ số đã chuẩn hóa
         """
         normalized = {}
         lower_is_better = ['execution_time', 'final_cost', 'average_path_length']
@@ -246,7 +246,7 @@ class AlgorithmComparator:
             if not values:
                 continue
 
-            # Normalize to 0-1
+            # Chuẩn hóa về 0-1
             min_val = min(values.values())
             max_val = max(values.values())
             range_val = max_val - min_val if max_val != min_val else 1.0
@@ -255,7 +255,7 @@ class AlgorithmComparator:
             for algo, value in values.items():
                 norm_value = (value - min_val) / range_val
 
-                # Invert if lower is better
+                # Đảo ngược nếu thấp hơn là tốt hơn
                 if metric_name in lower_is_better:
                     norm_value = 1.0 - norm_value
 
@@ -265,13 +265,13 @@ class AlgorithmComparator:
 
     def benchmark(self, n_runs: int = 5) -> Dict[AlgorithmType, Dict[str, float]]:
         """
-        Run multiple comparisons and calculate average metrics.
+        Chạy nhiều lần so sánh và tính toán các chỉ số trung bình.
 
         Args:
-            n_runs: Number of runs to average
+            n_runs: Số lần chạy để tính trung bình
 
         Returns:
-            Dictionary of algorithm -> averaged metrics
+            Từ điển của thuật toán -> các chỉ số trung bình
         """
         all_metrics: Dict[AlgorithmType, List[AlgorithmMetrics]] = {
             AlgorithmType.GBFS: [],
@@ -284,7 +284,7 @@ class AlgorithmComparator:
             for algo, metrics in result.metrics.items():
                 all_metrics[algo].append(metrics)
 
-        # Calculate averages
+        # Tính toán trung bình
         averages = {}
         for algo, metrics_list in all_metrics.items():
             if not metrics_list:
@@ -303,7 +303,7 @@ class AlgorithmComparator:
 
     @staticmethod
     def _std(values: List[float]) -> float:
-        """Calculate standard deviation."""
+        """Tính độ lệch chuẩn."""
         if len(values) < 2:
             return 0.0
         mean = sum(values) / len(values)
@@ -312,34 +312,34 @@ class AlgorithmComparator:
 
     def generate_comparison_table(self, result: ComparisonResult) -> str:
         """
-        Generate a text table comparing algorithm metrics.
+        Tạo bảng văn bản so sánh các chỉ số thuật toán.
 
         Args:
-            result: Comparison result
+            result: Kết quả so sánh
 
         Returns:
-            Formatted table string
+            Chuỗi bảng đã định dạng
         """
         lines = []
         lines.append("=" * 70)
-        lines.append("ALGORITHM COMPARISON RESULTS")
+        lines.append("KẾT QUẢ SO SÁNH THUẬT TOÁN")
         lines.append("=" * 70)
         lines.append("")
 
-        # Header
-        header = f"{'Metric':<25} | {'GBFS':>12} | {'GWO':>12} | {'Hybrid':>12}"
+        # Tiêu đề
+        header = f"{'Chỉ số':<25} | {'GBFS':>12} | {'GWO':>12} | {'Hybrid':>12}"
         lines.append(header)
         lines.append("-" * 70)
 
-        # Metrics
+        # Các chỉ số
         metrics_display = [
-            ('Execution Time (s)', 'execution_time_seconds', '{:.3f}'),
-            ('Final Cost', 'final_cost', '{:.2f}'),
-            ('Routes Found', 'routes_found', '{:d}'),
-            ('Evacuees Covered', 'evacuees_covered', '{:,d}'),
-            ('Coverage Rate (%)', 'coverage_rate', '{:.1%}'),
-            ('Avg Path Length', 'average_path_length', '{:.1f}'),
-            ('Iterations', 'iterations', '{:d}')
+            ('Thời gian thực thi (s)', 'execution_time_seconds', '{:.3f}'),
+            ('Chi phí cuối cùng', 'final_cost', '{:.2f}'),
+            ('Tuyến đường tìm thấy', 'routes_found', '{:d}'),
+            ('Người được sơ tán', 'evacuees_covered', '{:,d}'),
+            ('Tỷ lệ bao phủ (%)', 'coverage_rate', '{:.1%}'),
+            ('Độ dài đường TB', 'average_path_length', '{:.1f}'),
+            ('Số lần lặp', 'iterations', '{:d}')
         ]
 
         for display_name, attr_name, fmt in metrics_display:
@@ -362,11 +362,11 @@ class AlgorithmComparator:
 
         lines.append("-" * 70)
 
-        # Winner
+        # Người chiến thắng
         if result.winner:
-            lines.append(f"WINNER: {result.winner.value.upper()} (Score: {result.winner_score:.3f})")
+            lines.append(f"CHIẾN THẮNG: {result.winner.value.upper()} (Điểm số: {result.winner_score:.3f})")
         else:
-            lines.append("WINNER: N/A")
+            lines.append("CHIẾN THẮNG: N/A")
 
         lines.append("=" * 70)
 
@@ -377,12 +377,12 @@ def run_comparison(network: EvacuationNetwork,
                    config: Optional[AlgorithmConfig] = None,
                    verbose: bool = True) -> ComparisonResult:
     """
-    Convenience function to run algorithm comparison.
+    Hàm tiện ích để chạy so sánh thuật toán.
 
     Args:
-        network: Evacuation network
-        config: Algorithm configuration
-        verbose: Whether to print results
+        network: Mạng lưới sơ tán
+        config: Cấu hình thuật toán
+        verbose: Có in kết quả hay không
 
     Returns:
         ComparisonResult

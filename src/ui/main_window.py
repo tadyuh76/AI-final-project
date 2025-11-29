@@ -411,13 +411,29 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str)
     def _on_algorithm_changed(self, algorithm: str):
-        """Xử lý khi thuật toán thay đổi."""
+        """Xử lý khi thuật toán thay đổi - dừng và reset."""
+        # Stop all running workers
+        self._stop_all_workers()
+
+        # Reset map and simulation
+        if self._network:
+            self._network.reset_simulation_state()
+
+        self.map_widget.clear_routes()
+        self.map_widget.stop_animation()
+        self.dashboard.reset()
+
+        # Update UI state
+        self.control_panel.set_running_state(False)
+
+        # Update algorithm label
         algo_names = {
             'gbfs': 'GBFS',
             'gwo': 'GWO',
             'hybrid': 'Hybrid GBFS+GWO'
         }
         self.algo_label.setText(algo_names.get(algorithm, algorithm))
+        self.status_label.setText(f"Đã chọn thuật toán: {algo_names.get(algorithm, algorithm)}")
 
     @pyqtSlot(dict)
     def _on_config_changed(self, config: Dict[str, Any]):

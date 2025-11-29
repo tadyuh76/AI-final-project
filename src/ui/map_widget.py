@@ -11,15 +11,14 @@ from PyQt6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsItem,
     QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsRectItem,
     QGraphicsTextItem, QGraphicsItemGroup, QWidget, QVBoxLayout,
-    QGraphicsPolygonItem
+    QGraphicsPolygonItem, QHBoxLayout, QPushButton, QLabel, QFrame
 )
 from PyQt6.QtCore import (
-    Qt, QPointF, QRectF, QTimer, pyqtSignal, QLineF,
-    QPropertyAnimation, QEasingCurve
+    Qt, QPointF, QRectF, QTimer, pyqtSignal, QLineF
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
-    QRadialGradient, QLinearGradient, QPolygonF, QTransform
+    QRadialGradient, QLinearGradient, QPolygonF, QTransform, QWheelEvent
 )
 
 from .styles import COLORS, hex_to_rgb, Animation, MapStyle, Sizes
@@ -33,16 +32,6 @@ def hex_to_qcolor(hex_color: str, alpha: int = 255) -> QColor:
     return QColor(r, g, b, alpha)
 
 
-@dataclass
-class EvacueeGroup:
-    """Nhóm người sơ tán đang di chuyển trên tuyến đường."""
-    route_id: str
-    count: int
-    progress: float  # 0.0 - 1.0
-    path_points: List[QPointF]
-    color: QColor
-
-
 class PopulationZoneItem(QGraphicsEllipseItem):
     """Hiển thị khu vực dân cư trên bản đồ."""
 
@@ -52,25 +41,23 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         self.base_size = size
 
         self.setPos(x, y)
-        self.setZValue(10)  # Above roads
+        self.setZValue(10)
 
         # Styling
-        color = hex_to_qcolor(COLORS.cyan, 180)
+        color = hex_to_qcolor(COLORS.cyan, 200)
         self.setBrush(QBrush(color))
         self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
 
         self.setToolTip(
             f"<b>{zone.name or zone.id}</b><br>"
-            f"Dan so: {zone.population:,}<br>"
-            f"Da so tan: {zone.evacuated:,}<br>"
-            f"Quan: {zone.district_name}"
+            f"Dân số: {zone.population:,}<br>"
+            f"Quận: {zone.district_name}"
         )
-
         self.setAcceptHoverEvents(True)
 
     def hoverEnterEvent(self, event):
         self.setPen(QPen(hex_to_qcolor(COLORS.primary), 3))
-        self.setScale(1.2)
+        self.setScale(1.3)
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
@@ -83,13 +70,12 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         self.zone.evacuated = evacuated
         progress = self.zone.evacuation_progress
 
-        # Đổi màu dựa trên tiến độ
         if progress >= 0.8:
-            color = hex_to_qcolor(COLORS.success, 180)
+            color = hex_to_qcolor(COLORS.success, 200)
         elif progress >= 0.5:
-            color = hex_to_qcolor(COLORS.warning, 180)
+            color = hex_to_qcolor(COLORS.warning, 200)
         else:
-            color = hex_to_qcolor(COLORS.cyan, 180)
+            color = hex_to_qcolor(COLORS.cyan, 200)
 
         self.setBrush(QBrush(color))
 
@@ -103,29 +89,24 @@ class ShelterItem(QGraphicsRectItem):
         self.base_size = size
 
         self.setPos(x, y)
-        self.setZValue(15)  # Above zones
+        self.setZValue(15)
 
-        # Styling với bo góc (dùng custom paint)
-        self.setBrush(QBrush(hex_to_qcolor(COLORS.success, 200)))
+        self.setBrush(QBrush(hex_to_qcolor(COLORS.success, 220)))
         self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
 
         self._update_tooltip()
         self.setAcceptHoverEvents(True)
 
-        # Capacity bar
-        self.capacity_bar = None
-
     def _update_tooltip(self):
         self.setToolTip(
             f"<b>{self.shelter.name or self.shelter.id}</b><br>"
-            f"Loai: {self.shelter.shelter_type}<br>"
-            f"Suc chua: {self.shelter.current_occupancy:,}/{self.shelter.capacity:,}<br>"
-            f"Con trong: {self.shelter.available_capacity:,}"
+            f"Loại: {self.shelter.shelter_type}<br>"
+            f"Sức chứa: {self.shelter.current_occupancy:,}/{self.shelter.capacity:,}"
         )
 
     def hoverEnterEvent(self, event):
         self.setPen(QPen(hex_to_qcolor(COLORS.primary), 3))
-        self.setScale(1.2)
+        self.setScale(1.3)
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
@@ -138,13 +119,12 @@ class ShelterItem(QGraphicsRectItem):
         self.shelter.current_occupancy = occupancy
         rate = self.shelter.occupancy_rate
 
-        # Đổi màu dựa trên mức lấp đầy
         if rate >= 0.9:
-            color = hex_to_qcolor(COLORS.danger, 200)
+            color = hex_to_qcolor(COLORS.danger, 220)
         elif rate >= 0.7:
-            color = hex_to_qcolor(COLORS.warning, 200)
+            color = hex_to_qcolor(COLORS.warning, 220)
         else:
-            color = hex_to_qcolor(COLORS.success, 200)
+            color = hex_to_qcolor(COLORS.success, 220)
 
         self.setBrush(QBrush(color))
         self._update_tooltip()
@@ -160,46 +140,43 @@ class HazardZoneItem(QGraphicsEllipseItem):
         self.base_radius = radius_pixels
 
         self.setPos(x, y)
-        self.setZValue(5)  # Below nodes but above roads
+        self.setZValue(5)
 
-        # Pulse animation state
-        self.pulse_phase = 0.0
+        self.pulse_phase = 0.5
         self.pulse_direction = 1
 
         self._update_appearance()
 
     def _update_appearance(self):
         """Cập nhật giao diện với gradient và opacity."""
-        # Radial gradient từ tâm ra ngoài
         gradient = QRadialGradient(0, 0, self.base_radius)
         base_color = hex_to_qcolor(COLORS.danger)
 
-        # Tâm đặc hơn
+        alpha = int(180 * self.pulse_phase)
         gradient.setColorAt(0, QColor(base_color.red(), base_color.green(),
-                                      base_color.blue(), int(180 * self.pulse_phase)))
-        # Rìa mờ dần
+                                      base_color.blue(), alpha))
         gradient.setColorAt(0.7, QColor(base_color.red(), base_color.green(),
-                                        base_color.blue(), int(100 * self.pulse_phase)))
+                                        base_color.blue(), int(alpha * 0.5)))
         gradient.setColorAt(1, QColor(base_color.red(), base_color.green(),
                                       base_color.blue(), 0))
 
         self.setBrush(QBrush(gradient))
-        self.setPen(QPen(hex_to_qcolor(COLORS.danger, int(150 * self.pulse_phase)), 2))
+        self.setPen(QPen(hex_to_qcolor(COLORS.danger, int(200 * self.pulse_phase)), 2))
 
         self.setToolTip(
-            f"<b>Vung Nguy Hiem</b><br>"
-            f"Loai: {self.hazard.hazard_type}<br>"
-            f"Ban kinh: {self.hazard.radius_km:.1f} km<br>"
-            f"Muc do rui ro: {self.hazard.risk_level:.0%}"
+            f"<b>Vùng Nguy Hiểm</b><br>"
+            f"Loại: {self.hazard.hazard_type}<br>"
+            f"Bán kính: {self.hazard.radius_km:.1f} km<br>"
+            f"Rủi ro: {self.hazard.risk_level:.0%}"
         )
 
     def pulse_tick(self):
         """Cập nhật hiệu ứng pulse."""
-        self.pulse_phase += Animation.HAZARD_PULSE_SPEED * self.pulse_direction
+        self.pulse_phase += 0.03 * self.pulse_direction
 
-        if self.pulse_phase >= Animation.HAZARD_PULSE_MAX:
+        if self.pulse_phase >= 1.0:
             self.pulse_direction = -1
-        elif self.pulse_phase <= Animation.HAZARD_PULSE_MIN:
+        elif self.pulse_phase <= 0.3:
             self.pulse_direction = 1
 
         self._update_appearance()
@@ -222,7 +199,7 @@ class RouteItem(QGraphicsPathItem):
         self.flow = flow
         self.risk = risk
 
-        self.setZValue(2)  # Below nodes
+        self.setZValue(8)
         self._build_path()
         self._update_style()
 
@@ -234,40 +211,21 @@ class RouteItem(QGraphicsPathItem):
         path = QPainterPath()
         path.moveTo(self.path_points[0])
 
-        if len(self.path_points) == 2:
-            path.lineTo(self.path_points[1])
-        else:
-            # Bezier curve qua các điểm
-            for i in range(1, len(self.path_points) - 1):
-                p0 = self.path_points[i - 1]
-                p1 = self.path_points[i]
-                p2 = self.path_points[i + 1]
-
-                # Control points cho smooth curve
-                ctrl1 = QPointF((p0.x() + p1.x()) / 2, (p0.y() + p1.y()) / 2)
-                ctrl2 = QPointF((p1.x() + p2.x()) / 2, (p1.y() + p2.y()) / 2)
-
-                path.quadTo(p1, ctrl2)
-
-            # Đoạn cuối
-            path.lineTo(self.path_points[-1])
+        for i in range(1, len(self.path_points)):
+            path.lineTo(self.path_points[i])
 
         self.setPath(path)
 
     def _update_style(self):
         """Cập nhật kiểu dáng dựa trên flow và risk."""
-        # Độ dày dựa trên flow
-        width = max(MapStyle.ROAD_WIDTH_MIN,
-                    min(MapStyle.ROAD_WIDTH_MAX,
-                        MapStyle.ROAD_WIDTH_MIN + self.flow * MapStyle.ROAD_WIDTH_FACTOR))
+        width = max(3, min(12, 3 + self.flow * 0.0005))
 
-        # Màu dựa trên risk
         if self.risk > 0.7:
-            color = hex_to_qcolor(COLORS.danger, 180)
+            color = hex_to_qcolor(COLORS.danger, 220)
         elif self.risk > 0.4:
-            color = hex_to_qcolor(COLORS.warning, 180)
+            color = hex_to_qcolor(COLORS.warning, 220)
         else:
-            color = hex_to_qcolor(COLORS.success, 180)
+            color = hex_to_qcolor(COLORS.success, 220)
 
         self.setPen(QPen(color, width, Qt.PenStyle.SolidLine,
                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
@@ -284,7 +242,6 @@ class RouteItem(QGraphicsPathItem):
         if not self.path_points or len(self.path_points) < 2:
             return QPointF(0, 0)
 
-        # Tính tổng chiều dài
         total_length = 0.0
         segments = []
         for i in range(len(self.path_points) - 1):
@@ -297,13 +254,11 @@ class RouteItem(QGraphicsPathItem):
         if total_length == 0:
             return self.path_points[0]
 
-        # Tìm điểm tại progress
         target_dist = progress * total_length
         current_dist = 0.0
 
         for p1, p2, length in segments:
             if current_dist + length >= target_dist:
-                # Điểm nằm trong segment này
                 segment_progress = (target_dist - current_dist) / length if length > 0 else 0
                 x = p1.x() + (p2.x() - p1.x()) * segment_progress
                 y = p1.y() + (p2.y() - p1.y()) * segment_progress
@@ -316,14 +271,13 @@ class RouteItem(QGraphicsPathItem):
 class EvacueeParticle(QGraphicsEllipseItem):
     """Hạt đại diện cho nhóm người sơ tán đang di chuyển."""
 
-    def __init__(self, size: float = 4):
+    def __init__(self, size: float = 6):
         super().__init__(-size/2, -size/2, size, size)
-        self.setZValue(20)  # On top of everything
+        self.setZValue(20)
 
-        # Default cyan color
-        color = hex_to_qcolor(COLORS.cyan, 220)
+        color = hex_to_qcolor(COLORS.cyan, 255)
         self.setBrush(QBrush(color))
-        self.setPen(QPen(Qt.PenStyle.NoPen))
+        self.setPen(QPen(hex_to_qcolor(COLORS.text), 1))
 
     def set_color(self, color: QColor):
         """Cập nhật màu của hạt."""
@@ -332,35 +286,32 @@ class EvacueeParticle(QGraphicsEllipseItem):
 
 class MapCanvas(QGraphicsView):
     """
-    Canvas bản đồ hiệu suất cao với hỗ trợ OpenGL.
+    Canvas bản đồ hiệu suất cao.
     Hiển thị mạng lưới sơ tán với hoạt hình thời gian thực.
     """
 
-    # Signals
-    node_clicked = pyqtSignal(str, str)  # node_id, node_type
+    node_clicked = pyqtSignal(str, str)
     zoom_changed = pyqtSignal(float)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        # Scene setup
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
 
         # View settings
         self.setRenderHints(
             QPainter.RenderHint.Antialiasing |
-            QPainter.RenderHint.SmoothPixmapTransform |
-            QPainter.RenderHint.TextAntialiasing
+            QPainter.RenderHint.SmoothPixmapTransform
         )
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
-        # Background
+        # Background with grid
         self.setBackgroundBrush(QBrush(hex_to_qcolor(COLORS.background)))
 
         # State
@@ -375,11 +326,8 @@ class MapCanvas(QGraphicsView):
         self._particles: List[EvacueeParticle] = []
         self._particle_pool: List[EvacueeParticle] = []
 
-        # Coordinate transformation
-        self._bounds: Optional[Tuple[float, float, float, float]] = None
-        self._scale_factor = 1.0
-        self._offset_x = 0.0
-        self._offset_y = 0.0
+        # Coordinate transformation - use fixed scale
+        self._scale_factor = 5000.0  # pixels per degree
 
         # Animation timer
         self._animation_timer = QTimer(self)
@@ -389,13 +337,45 @@ class MapCanvas(QGraphicsView):
         # Active evacuee groups for animation
         self._active_groups: List[Dict[str, Any]] = []
 
+    def drawBackground(self, painter: QPainter, rect: QRectF):
+        """Vẽ nền với lưới."""
+        # Fill background
+        painter.fillRect(rect, hex_to_qcolor(COLORS.background))
+
+        # Draw grid
+        grid_size = 50  # pixels between grid lines
+        grid_color = hex_to_qcolor(COLORS.surface, 100)
+        grid_pen = QPen(grid_color, 1, Qt.PenStyle.DotLine)
+        painter.setPen(grid_pen)
+
+        # Calculate visible grid lines
+        left = int(rect.left() / grid_size) * grid_size
+        top = int(rect.top() / grid_size) * grid_size
+
+        # Vertical lines
+        x = left
+        while x < rect.right():
+            painter.drawLine(int(x), int(rect.top()), int(x), int(rect.bottom()))
+            x += grid_size
+
+        # Horizontal lines
+        y = top
+        while y < rect.bottom():
+            painter.drawLine(int(rect.left()), int(y), int(rect.right()), int(y))
+            y += grid_size
+
     def set_network(self, network: EvacuationNetwork):
         """Thiết lập mạng lưới và vẽ lên canvas."""
         self._network = network
         self._clear_all()
-        self._calculate_transform()
         self._draw_network()
-        self.fit_to_view()
+
+        # Set scene rect based on items
+        self._scene.setSceneRect(self._scene.itemsBoundingRect().adjusted(-100, -100, 100, 100))
+
+        # Fit to view
+        self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+        self._zoom_level = 1.0
 
     def _clear_all(self):
         """Xóa tất cả các item khỏi scene."""
@@ -406,47 +386,10 @@ class MapCanvas(QGraphicsView):
         self._route_items.clear()
         self._particles.clear()
 
-    def _calculate_transform(self):
-        """Tính toán transform từ lat/lon sang pixel."""
-        if not self._network:
-            return
-
-        bounds = self._network.get_bounds()
-        if bounds[0] == float('inf'):
-            return
-
-        self._bounds = bounds
-        min_lat, max_lat, min_lon, max_lon = bounds
-
-        # Padding
-        padding = 50
-        view_width = self.viewport().width() - 2 * padding
-        view_height = self.viewport().height() - 2 * padding
-
-        if view_width <= 0 or view_height <= 0:
-            view_width = 800
-            view_height = 600
-
-        # Scale để vừa viewport
-        lat_range = max_lat - min_lat
-        lon_range = max_lon - min_lon
-
-        if lat_range > 0 and lon_range > 0:
-            scale_x = view_width / lon_range
-            scale_y = view_height / lat_range
-            self._scale_factor = min(scale_x, scale_y)
-        else:
-            self._scale_factor = 1000.0
-
-        # Offset để căn giữa
-        self._offset_x = -min_lon * self._scale_factor + padding
-        self._offset_y = -min_lat * self._scale_factor + padding
-
     def _lat_lon_to_pixel(self, lat: float, lon: float) -> QPointF:
         """Chuyển đổi lat/lon sang tọa độ pixel."""
-        # Lật trục Y vì pixel tăng xuống dưới
-        x = lon * self._scale_factor + self._offset_x
-        y = (self._bounds[1] - lat + self._bounds[0]) * self._scale_factor + 50 if self._bounds else 0
+        x = lon * self._scale_factor
+        y = -lat * self._scale_factor  # Flip Y axis
         return QPointF(x, y)
 
     def _draw_network(self):
@@ -454,7 +397,7 @@ class MapCanvas(QGraphicsView):
         if not self._network:
             return
 
-        # 1. Vẽ các cạnh (đường) trước
+        # 1. Vẽ các cạnh (đường)
         self._draw_edges()
 
         # 2. Vẽ vùng nguy hiểm
@@ -478,13 +421,24 @@ class MapCanvas(QGraphicsView):
             p1 = self._lat_lon_to_pixel(source.lat, source.lon)
             p2 = self._lat_lon_to_pixel(target.lat, target.lon)
 
-            # Vẽ đường đơn giản (không phải route sơ tán)
             path = QPainterPath()
             path.moveTo(p1)
             path.lineTo(p2)
 
             item = QGraphicsPathItem(path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.surface_light, 100), 1))
+
+            # Color based on flood risk
+            if edge.flood_risk > 0.7:
+                color = hex_to_qcolor(COLORS.danger, 120)
+                width = 2
+            elif edge.flood_risk > 0.3:
+                color = hex_to_qcolor(COLORS.warning, 100)
+                width = 1.5
+            else:
+                color = hex_to_qcolor(COLORS.surface_hover, 80)
+                width = 1
+
+            item.setPen(QPen(color, width))
             item.setZValue(1)
             self._scene.addItem(item)
 
@@ -496,8 +450,8 @@ class MapCanvas(QGraphicsView):
         for i, hazard in enumerate(self._network.get_hazard_zones()):
             pos = self._lat_lon_to_pixel(hazard.center_lat, hazard.center_lon)
 
-            # Convert km to pixels (approximate)
-            radius_pixels = hazard.radius_km * self._scale_factor * 0.01
+            # Convert km to pixels (roughly 1 degree = 111km)
+            radius_pixels = hazard.radius_km * self._scale_factor / 111.0
 
             item = HazardZoneItem(hazard, pos.x(), pos.y(), radius_pixels)
             self._scene.addItem(item)
@@ -508,27 +462,26 @@ class MapCanvas(QGraphicsView):
         if not self._network:
             return
 
-        # Vẽ khu vực dân cư
-        max_pop = max((z.population for z in self._network.get_population_zones()), default=1)
-        for zone in self._network.get_population_zones():
+        zones = self._network.get_population_zones()
+        shelters = self._network.get_shelters()
+
+        max_pop = max((z.population for z in zones), default=1)
+        for zone in zones:
             pos = self._lat_lon_to_pixel(zone.lat, zone.lon)
 
-            # Size dựa trên dân số
             size_ratio = zone.population / max_pop if max_pop > 0 else 0.5
-            size = MapStyle.ZONE_SIZE_MIN + (MapStyle.ZONE_SIZE_MAX - MapStyle.ZONE_SIZE_MIN) * size_ratio
+            size = 15 + 25 * size_ratio
 
             item = PopulationZoneItem(zone, pos.x(), pos.y(), size)
             self._scene.addItem(item)
             self._zone_items[zone.id] = item
 
-        # Vẽ nơi trú ẩn
-        max_cap = max((s.capacity for s in self._network.get_shelters()), default=1)
-        for shelter in self._network.get_shelters():
+        max_cap = max((s.capacity for s in shelters), default=1)
+        for shelter in shelters:
             pos = self._lat_lon_to_pixel(shelter.lat, shelter.lon)
 
-            # Size dựa trên sức chứa
             size_ratio = shelter.capacity / max_cap if max_cap > 0 else 0.5
-            size = MapStyle.SHELTER_SIZE_MIN + (MapStyle.SHELTER_SIZE_MAX - MapStyle.SHELTER_SIZE_MIN) * size_ratio
+            size = 18 + 30 * size_ratio
 
             item = ShelterItem(shelter, pos.x(), pos.y(), size)
             self._scene.addItem(item)
@@ -539,7 +492,6 @@ class MapCanvas(QGraphicsView):
         if not self._network:
             return
 
-        # Convert node IDs to pixel positions
         path_points = []
         for node_id in path_node_ids:
             node = self._network.get_node(node_id)
@@ -554,57 +506,57 @@ class MapCanvas(QGraphicsView):
         self._scene.addItem(item)
         self._route_items[route_id] = item
 
+        # Add particles for this route
+        self._add_route_particles(route_id, item, flow)
+
+    def _add_route_particles(self, route_id: str, route_item: RouteItem, flow: int):
+        """Add animated particles along a route."""
+        # Add 3-5 particles per route based on flow
+        num_particles = min(5, max(2, flow // 2000))
+
+        for i in range(num_particles):
+            particle = EvacueeParticle(8)
+            self._scene.addItem(particle)
+            self._particles.append(particle)
+
+            # Start at different positions along the route
+            initial_progress = i / num_particles
+
+            self._active_groups.append({
+                'route_id': route_id,
+                'count': flow // num_particles,
+                'progress': initial_progress,
+                'particle': particle,
+                'route_item': route_item,
+                'speed': 0.005 + (i * 0.001)  # Slightly different speeds
+            })
+
+            pos = route_item.get_point_at_progress(initial_progress)
+            particle.setPos(pos)
+            particle.show()
+
     def clear_routes(self):
         """Xóa tất cả các tuyến đường."""
         for item in self._route_items.values():
             self._scene.removeItem(item)
         self._route_items.clear()
 
-    def update_route_flow(self, route_id: str, flow: int, risk: float = None):
-        """Cập nhật lưu lượng của tuyến đường."""
-        if route_id in self._route_items:
-            self._route_items[route_id].update_flow(flow, risk)
+        # Clear particles
+        for particle in self._particles:
+            self._scene.removeItem(particle)
+        self._particles.clear()
+        self._active_groups.clear()
 
     def start_animation(self):
         """Bắt đầu hoạt hình."""
         if not self._animation_running:
-            self._animation_timer.start(Animation.FRAME_TIME_MS)
+            self._animation_timer.start(33)  # ~30 FPS
             self._animation_running = True
 
     def stop_animation(self):
         """Dừng hoạt hình."""
         self._animation_timer.stop()
         self._animation_running = False
-
-    def add_evacuee_group(self, route_id: str, count: int, path_node_ids: List[str]):
-        """Thêm nhóm người sơ tán để animate."""
-        if route_id not in self._route_items:
-            return
-
-        route_item = self._route_items[route_id]
-
-        # Lấy hoặc tạo particle
-        if self._particle_pool:
-            particle = self._particle_pool.pop()
-        else:
-            particle = EvacueeParticle(Animation.PARTICLE_SIZE)
-            self._scene.addItem(particle)
-
-        self._particles.append(particle)
-
-        # Thêm vào active groups
-        self._active_groups.append({
-            'route_id': route_id,
-            'count': count,
-            'progress': 0.0,
-            'particle': particle,
-            'route_item': route_item
-        })
-
-        # Đặt vị trí ban đầu
-        start_pos = route_item.get_point_at_progress(0)
-        particle.setPos(start_pos)
-        particle.show()
 
     def _animation_tick(self):
         """Cập nhật hoạt hình mỗi frame."""
@@ -613,30 +565,22 @@ class MapCanvas(QGraphicsView):
             hazard_item.pulse_tick()
 
         # Move evacuee particles
-        completed_groups = []
         for group in self._active_groups:
-            group['progress'] += Animation.PARTICLE_SPEED / 100.0
+            group['progress'] += group.get('speed', 0.01)
 
             if group['progress'] >= 1.0:
-                completed_groups.append(group)
+                group['progress'] = 0.0  # Loop back
+
+            pos = group['route_item'].get_point_at_progress(group['progress'])
+            group['particle'].setPos(pos)
+
+            # Color based on progress
+            if group['progress'] > 0.7:
+                group['particle'].set_color(hex_to_qcolor(COLORS.success, 255))
+            elif group['progress'] > 0.3:
+                group['particle'].set_color(hex_to_qcolor(COLORS.warning, 255))
             else:
-                # Update particle position
-                pos = group['route_item'].get_point_at_progress(group['progress'])
-                group['particle'].setPos(pos)
-
-                # Color based on progress
-                if group['progress'] > 0.8:
-                    group['particle'].set_color(hex_to_qcolor(COLORS.success, 220))
-                elif group['progress'] > 0.5:
-                    group['particle'].set_color(hex_to_qcolor(COLORS.warning, 220))
-
-        # Clean up completed groups
-        for group in completed_groups:
-            self._active_groups.remove(group)
-            particle = group['particle']
-            particle.hide()
-            self._particles.remove(particle)
-            self._particle_pool.append(particle)
+                group['particle'].set_color(hex_to_qcolor(COLORS.cyan, 255))
 
     def update_zone_progress(self, zone_id: str, evacuated: int):
         """Cập nhật tiến độ sơ tán của khu vực."""
@@ -651,7 +595,7 @@ class MapCanvas(QGraphicsView):
     def update_hazard(self, hazard_index: int, radius_km: float, risk_level: float):
         """Cập nhật vùng nguy hiểm."""
         if hazard_index in self._hazard_items:
-            radius_pixels = radius_km * self._scale_factor * 0.01
+            radius_pixels = radius_km * self._scale_factor / 111.0
             self._hazard_items[hazard_index].update_hazard(radius_pixels, risk_level)
 
     def fit_to_view(self):
@@ -662,23 +606,19 @@ class MapCanvas(QGraphicsView):
 
     def zoom_in(self):
         """Zoom in."""
-        self._zoom_level *= MapStyle.ZOOM_STEP
-        if self._zoom_level > MapStyle.ZOOM_MAX:
-            self._zoom_level = MapStyle.ZOOM_MAX
-        else:
-            self.scale(MapStyle.ZOOM_STEP, MapStyle.ZOOM_STEP)
-            self.zoom_changed.emit(self._zoom_level)
+        factor = 1.25
+        self._zoom_level *= factor
+        self.scale(factor, factor)
+        self.zoom_changed.emit(self._zoom_level)
 
     def zoom_out(self):
         """Zoom out."""
-        self._zoom_level /= MapStyle.ZOOM_STEP
-        if self._zoom_level < MapStyle.ZOOM_MIN:
-            self._zoom_level = MapStyle.ZOOM_MIN
-        else:
-            self.scale(1 / MapStyle.ZOOM_STEP, 1 / MapStyle.ZOOM_STEP)
-            self.zoom_changed.emit(self._zoom_level)
+        factor = 0.8
+        self._zoom_level *= factor
+        self.scale(factor, factor)
+        self.zoom_changed.emit(self._zoom_level)
 
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: QWheelEvent):
         """Xử lý scroll để zoom."""
         delta = event.angleDelta().y()
         if delta > 0:
@@ -686,18 +626,10 @@ class MapCanvas(QGraphicsView):
         elif delta < 0:
             self.zoom_out()
 
-    def resizeEvent(self, event):
-        """Xử lý resize viewport."""
-        super().resizeEvent(event)
-        if self._network:
-            self._calculate_transform()
-            self.fit_to_view()
-
 
 class MapWidget(QWidget):
     """Widget container cho bản đồ với controls."""
 
-    # Signals
     node_clicked = pyqtSignal(str, str)
     zoom_changed = pyqtSignal(float)
 
@@ -708,14 +640,104 @@ class MapWidget(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(4)
+
+        # Toolbar
+        toolbar = QFrame()
+        toolbar.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS.surface};
+                border-radius: 6px;
+                padding: 4px;
+            }}
+        """)
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(8, 4, 8, 4)
+        toolbar_layout.setSpacing(8)
+
+        # Zoom buttons with clear styling
+        btn_style = f"""
+            QPushButton {{
+                background-color: {COLORS.surface_hover};
+                color: {COLORS.text};
+                border: 1px solid {COLORS.border};
+                border-radius: 4px;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 4px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS.primary};
+                color: white;
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS.primary_dark};
+            }}
+        """
+
+        self.zoom_in_btn = QPushButton("+")
+        self.zoom_in_btn.setFixedSize(36, 36)
+        self.zoom_in_btn.setStyleSheet(btn_style)
+        self.zoom_in_btn.setToolTip("Phóng to")
+        self.zoom_in_btn.clicked.connect(self._on_zoom_in)
+        toolbar_layout.addWidget(self.zoom_in_btn)
+
+        self.zoom_out_btn = QPushButton("−")
+        self.zoom_out_btn.setFixedSize(36, 36)
+        self.zoom_out_btn.setStyleSheet(btn_style)
+        self.zoom_out_btn.setToolTip("Thu nhỏ")
+        self.zoom_out_btn.clicked.connect(self._on_zoom_out)
+        toolbar_layout.addWidget(self.zoom_out_btn)
+
+        self.fit_btn = QPushButton("⊡")
+        self.fit_btn.setFixedSize(36, 36)
+        self.fit_btn.setStyleSheet(btn_style)
+        self.fit_btn.setToolTip("Vừa khung hình")
+        self.fit_btn.clicked.connect(self._on_fit)
+        toolbar_layout.addWidget(self.fit_btn)
+
+        toolbar_layout.addSpacing(20)
+
+        # Legend
+        legend_style = f"color: {COLORS.text_muted}; font-size: 10px;"
+
+        # Cyan circle = population zone
+        pop_legend = QLabel("● Khu dân cư")
+        pop_legend.setStyleSheet(f"color: {COLORS.cyan}; font-size: 10px;")
+        toolbar_layout.addWidget(pop_legend)
+
+        # Green square = shelter
+        shelter_legend = QLabel("■ Nơi trú ẩn")
+        shelter_legend.setStyleSheet(f"color: {COLORS.success}; font-size: 10px;")
+        toolbar_layout.addWidget(shelter_legend)
+
+        # Red circle = hazard
+        hazard_legend = QLabel("◉ Vùng nguy hiểm")
+        hazard_legend.setStyleSheet(f"color: {COLORS.danger}; font-size: 10px;")
+        toolbar_layout.addWidget(hazard_legend)
+
+        toolbar_layout.addStretch()
+
+        self.info_label = QLabel("Cuộn để zoom, kéo để di chuyển")
+        self.info_label.setStyleSheet(f"color: {COLORS.text_muted}; font-size: 10px;")
+        toolbar_layout.addWidget(self.info_label)
+
+        layout.addWidget(toolbar)
 
         # Canvas
         self.canvas = MapCanvas(self)
         self.canvas.node_clicked.connect(self.node_clicked)
         self.canvas.zoom_changed.connect(self.zoom_changed)
-
         layout.addWidget(self.canvas)
+
+    def _on_zoom_in(self):
+        self.canvas.zoom_in()
+
+    def _on_zoom_out(self):
+        self.canvas.zoom_out()
+
+    def _on_fit(self):
+        self.canvas.fit_to_view()
 
     def set_network(self, network: EvacuationNetwork):
         """Thiết lập mạng lưới."""
@@ -739,7 +761,8 @@ class MapWidget(QWidget):
 
     def add_evacuee_group(self, route_id: str, count: int, path_node_ids: List[str]):
         """Thêm nhóm người sơ tán."""
-        self.canvas.add_evacuee_group(route_id, count, path_node_ids)
+        # This is now handled automatically in add_route
+        pass
 
     def update_zone_progress(self, zone_id: str, evacuated: int):
         """Cập nhật tiến độ khu vực."""

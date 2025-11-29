@@ -39,7 +39,7 @@ class LabeledSlider(QWidget):
 
         # Label
         self.label = QLabel(label)
-        self.label.setMinimumWidth(100)
+        self.label.setMinimumWidth(80)
         layout.addWidget(self.label)
 
         # Slider
@@ -52,7 +52,7 @@ class LabeledSlider(QWidget):
 
         # Value display
         self.value_label = QLabel(f"{default:.{decimals}f}")
-        self.value_label.setMinimumWidth(50)
+        self.value_label.setMinimumWidth(45)
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.value_label)
 
@@ -83,7 +83,7 @@ class LabeledSpinBox(QWidget):
 
         # Label
         self.label = QLabel(label)
-        self.label.setMinimumWidth(100)
+        self.label.setMinimumWidth(80)
         layout.addWidget(self.label)
 
         # SpinBox
@@ -114,7 +114,7 @@ class TyphoonCategorySelector(QWidget):
         layout.setSpacing(4)
 
         # Label
-        label = QLabel("Cap bao")
+        label = QLabel("Cấp bão")
         label.setProperty("subheading", True)
         layout.addWidget(label)
 
@@ -235,20 +235,20 @@ class ControlPanel(QWidget):
         layout.setSpacing(Sizes.PADDING_MD)
 
         # ===== Tiêu đề =====
-        title = QLabel("BANG DIEU KHIEN")
+        title = QLabel("BẢNG ĐIỀU KHIỂN")
         title.setProperty("heading", True)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # ===== Chọn thuật toán =====
-        algo_group = QGroupBox("Thuat toan")
+        algo_group = QGroupBox("Thuật toán")
         algo_layout = QVBoxLayout(algo_group)
 
         self.algorithm_combo = QComboBox()
         self.algorithm_combo.addItems([
-            "GBFS + GWO (Hybrid)",
-            "GBFS (Tim duong tham lam)",
-            "GWO (Toi uu bay soi)"
+            "GBFS + GWO (Lai ghép)",
+            "GBFS (Tìm đường tham lam)",
+            "GWO (Tối ưu bầy sói)"
         ])
         self.algorithm_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addWidget(self.algorithm_combo)
@@ -256,7 +256,7 @@ class ControlPanel(QWidget):
         layout.addWidget(algo_group)
 
         # ===== Cấp độ bão =====
-        typhoon_group = QGroupBox("Kich ban bao")
+        typhoon_group = QGroupBox("Kịch bản bão")
         typhoon_layout = QVBoxLayout(typhoon_group)
 
         self.typhoon_selector = TyphoonCategorySelector()
@@ -265,7 +265,7 @@ class ControlPanel(QWidget):
 
         # Population slider
         self.population_slider = LabeledSlider(
-            "Dan so (%)", 10, 100, 50, decimals=0
+            "Dân số (%)", 10, 100, 50, decimals=0
         )
         self.population_slider.value_changed.connect(self._on_config_changed)
         typhoon_layout.addWidget(self.population_slider)
@@ -273,67 +273,67 @@ class ControlPanel(QWidget):
         layout.addWidget(typhoon_group)
 
         # ===== Tham số thuật toán =====
-        params_group = QGroupBox("Tham so thuat toan")
+        params_group = QGroupBox("Tham số thuật toán")
         params_layout = QVBoxLayout(params_group)
 
         # Trọng số GBFS
-        self.weight_distance = LabeledSlider("Khoang cach", 0, 1, 0.4)
+        self.weight_distance = LabeledSlider("Khoảng cách", 0, 1, 0.4)
         self.weight_distance.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.weight_distance)
 
-        self.weight_risk = LabeledSlider("Rui ro", 0, 1, 0.3)
+        self.weight_risk = LabeledSlider("Rủi ro", 0, 1, 0.3)
         self.weight_risk.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.weight_risk)
 
-        self.weight_congestion = LabeledSlider("Tac nghen", 0, 1, 0.2)
+        self.weight_congestion = LabeledSlider("Tắc nghẽn", 0, 1, 0.2)
         self.weight_congestion.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.weight_congestion)
 
-        self.weight_capacity = LabeledSlider("Suc chua", 0, 1, 0.1)
+        self.weight_capacity = LabeledSlider("Sức chứa", 0, 1, 0.1)
         self.weight_capacity.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.weight_capacity)
 
         # Tham số GWO
         params_layout.addWidget(QLabel(""))  # Spacer
 
-        self.n_wolves = LabeledSpinBox("So soi", 10, 100, 30)
+        self.n_wolves = LabeledSpinBox("Số sói", 10, 100, 34)
         self.n_wolves.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.n_wolves)
 
-        self.max_iterations = LabeledSpinBox("Vong lap", 10, 500, 100)
+        self.max_iterations = LabeledSpinBox("Vòng lặp", 10, 500, 100)
         self.max_iterations.value_changed.connect(self._on_config_changed)
         params_layout.addWidget(self.max_iterations)
 
         layout.addWidget(params_group)
 
         # ===== Nút điều khiển =====
-        controls_group = QGroupBox("Dieu khien")
+        controls_group = QGroupBox("Điều khiển")
         controls_layout = QVBoxLayout(controls_group)
 
         # Run button - prominent
-        self.run_button = QPushButton(">>> CHAY <<<")
+        self.run_button = QPushButton("▶ CHẠY")
         self.run_button.setProperty("primary", True)
         self.run_button.setMinimumHeight(48)
-        self.run_button.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        self.run_button.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         self.run_button.clicked.connect(self.run_clicked)
         controls_layout.addWidget(self.run_button)
 
         # Secondary controls
         btn_row = QHBoxLayout()
 
-        self.pause_button = QPushButton("Tam dung")
+        self.pause_button = QPushButton("⏸ Tạm dừng")
         self.pause_button.clicked.connect(self._on_pause_clicked)
         self.pause_button.setEnabled(False)
         btn_row.addWidget(self.pause_button)
 
-        self.reset_button = QPushButton("Dat lai")
+        self.reset_button = QPushButton("↻ Đặt lại")
         self.reset_button.clicked.connect(self.reset_clicked)
         btn_row.addWidget(self.reset_button)
 
         controls_layout.addLayout(btn_row)
 
         # Stop button
-        self.stop_button = QPushButton("Dung lai")
+        self.stop_button = QPushButton("⏹ Dừng lại")
         self.stop_button.setProperty("danger", True)
         self.stop_button.clicked.connect(self.stop_clicked)
         self.stop_button.setEnabled(False)
@@ -342,26 +342,26 @@ class ControlPanel(QWidget):
         layout.addWidget(controls_group)
 
         # ===== Tùy chọn mô phỏng =====
-        sim_group = QGroupBox("Mo phong")
+        sim_group = QGroupBox("Mô phỏng")
         sim_layout = QVBoxLayout(sim_group)
 
         # Tốc độ mô phỏng
-        self.speed_slider = LabeledSlider("Toc do", 0.1, 5.0, 1.0, decimals=1)
+        self.speed_slider = LabeledSlider("Tốc độ", 0.1, 5.0, 1.0, decimals=1)
         self.speed_slider.value_changed.connect(self._on_config_changed)
         sim_layout.addWidget(self.speed_slider)
 
         # Checkbox options
-        self.show_particles = QCheckBox("Hien thi particle")
+        self.show_particles = QCheckBox("Hiển thị hạt di chuyển")
         self.show_particles.setChecked(True)
         self.show_particles.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_particles)
 
-        self.show_routes = QCheckBox("Hien thi tuyen duong")
+        self.show_routes = QCheckBox("Hiển thị tuyến đường")
         self.show_routes.setChecked(True)
         self.show_routes.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_routes)
 
-        self.show_hazards = QCheckBox("Hien thi vung nguy hiem")
+        self.show_hazards = QCheckBox("Hiển thị vùng nguy hiểm")
         self.show_hazards.setChecked(True)
         self.show_hazards.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_hazards)
@@ -372,7 +372,7 @@ class ControlPanel(QWidget):
         layout.addStretch()
 
         # ===== Trạng thái hiện tại =====
-        self.status_label = QLabel("San sang")
+        self.status_label = QLabel("Sẵn sàng")
         self.status_label.setProperty("muted", True)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
@@ -380,19 +380,19 @@ class ControlPanel(QWidget):
     def _on_algorithm_changed(self, text: str):
         """Xử lý khi thuật toán thay đổi."""
         algo_map = {
-            "GBFS + GWO (Hybrid)": "hybrid",
-            "GBFS (Tim duong tham lam)": "gbfs",
-            "GWO (Toi uu bay soi)": "gwo"
+            "GBFS + GWO (Lai ghép)": "hybrid",
+            "GBFS (Tìm đường tham lam)": "gbfs",
+            "GWO (Tối ưu bầy sói)": "gwo"
         }
         self.algorithm_changed.emit(algo_map.get(text, "hybrid"))
 
     def _on_pause_clicked(self):
         """Xử lý nút pause/resume."""
-        if self.pause_button.text() == "Tam dung":
-            self.pause_button.setText("Tiep tuc")
+        if self.pause_button.text() == "⏸ Tạm dừng":
+            self.pause_button.setText("▶ Tiếp tục")
             self.pause_clicked.emit()
         else:
-            self.pause_button.setText("Tam dung")
+            self.pause_button.setText("⏸ Tạm dừng")
             self.pause_clicked.emit()
 
     def _on_config_changed(self, *args):
@@ -423,9 +423,9 @@ class ControlPanel(QWidget):
         """Lấy loại thuật toán được chọn."""
         text = self.algorithm_combo.currentText()
         algo_map = {
-            "GBFS + GWO (Hybrid)": "hybrid",
-            "GBFS (Tim duong tham lam)": "gbfs",
-            "GWO (Toi uu bay soi)": "gwo"
+            "GBFS + GWO (Lai ghép)": "hybrid",
+            "GBFS (Tìm đường tham lam)": "gbfs",
+            "GWO (Tối ưu bầy sói)": "gwo"
         }
         return algo_map.get(text, "hybrid")
 
@@ -436,21 +436,21 @@ class ControlPanel(QWidget):
         self.stop_button.setEnabled(running)
 
         if running:
-            self.status_label.setText("Dang chay...")
+            self.status_label.setText("Đang chạy...")
             self.status_label.setStyleSheet(f"color: {COLORS.success};")
         else:
-            self.status_label.setText("San sang")
+            self.status_label.setText("Sẵn sàng")
             self.status_label.setStyleSheet(f"color: {COLORS.text_muted};")
 
     def set_paused_state(self, paused: bool):
         """Cập nhật UI khi tạm dừng/tiếp tục."""
         if paused:
-            self.pause_button.setText("Tiep tuc")
-            self.status_label.setText("Tam dung")
+            self.pause_button.setText("▶ Tiếp tục")
+            self.status_label.setText("Tạm dừng")
             self.status_label.setStyleSheet(f"color: {COLORS.warning};")
         else:
-            self.pause_button.setText("Tam dung")
-            self.status_label.setText("Dang chay...")
+            self.pause_button.setText("⏸ Tạm dừng")
+            self.status_label.setText("Đang chạy...")
             self.status_label.setStyleSheet(f"color: {COLORS.success};")
 
     def set_completed_state(self):
@@ -458,8 +458,8 @@ class ControlPanel(QWidget):
         self.run_button.setEnabled(True)
         self.pause_button.setEnabled(False)
         self.stop_button.setEnabled(False)
-        self.pause_button.setText("Tam dung")
-        self.status_label.setText("Hoan thanh!")
+        self.pause_button.setText("⏸ Tạm dừng")
+        self.status_label.setText("Hoàn thành!")
         self.status_label.setStyleSheet(f"color: {COLORS.success};")
 
     def set_status(self, text: str, color: str = None):

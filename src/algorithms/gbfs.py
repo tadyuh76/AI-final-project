@@ -125,8 +125,21 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         if not shelters:
             return None, None, float('inf')
 
-        # Lọc các nơi trú ẩn có sức chứa
-        available_shelters = [s for s in shelters if s.has_capacity()]
+        # Lọc các nơi trú ẩn có sức chứa và không nằm trong vùng nguy hiểm cao
+        available_shelters = []
+        for s in shelters:
+            if not s.has_capacity():
+                continue
+            # Check if shelter is in high-risk hazard zone
+            shelter_risk = self.network.get_total_risk_at(s.lat, s.lon)
+            if shelter_risk > 0.5:  # Skip shelters in high-risk zones (consistent threshold)
+                continue
+            available_shelters.append(s)
+
+        if not available_shelters:
+            # If no safe shelters, use any available shelters as fallback
+            available_shelters = [s for s in shelters if s.has_capacity()]
+
         if not available_shelters:
             return None, None, float('inf')
 

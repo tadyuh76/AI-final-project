@@ -5,7 +5,7 @@ Dashboard hiển thị các chỉ số thời gian thực trong quá trình mô 
 from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame, QProgressBar, QSizePolicy
+    QLabel, QFrame, QProgressBar, QSizePolicy, QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush
@@ -27,31 +27,33 @@ class MetricCard(QFrame):
                  parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setProperty("card", True)
-        self.setMinimumHeight(80)
+        self.setMinimumHeight(70)
+        self.setMinimumWidth(180)
 
         self._color = color or COLORS.primary
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_SM,
-                                  Sizes.PADDING_MD, Sizes.PADDING_SM)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
         # Title
         self.title_label = QLabel(title)
         self.title_label.setProperty("muted", True)
-        self.title_label.setFont(QFont("Segoe UI", 10))
+        self.title_label.setFont(QFont("Arial", 10))
+        self.title_label.setWordWrap(True)
         layout.addWidget(self.title_label)
 
         # Value
         self.value_label = QLabel(value)
-        self.value_label.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        self.value_label.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         self.value_label.setStyleSheet(f"color: {self._color};")
         layout.addWidget(self.value_label)
 
         # Subtitle
         self.subtitle_label = QLabel(subtitle)
         self.subtitle_label.setProperty("muted", True)
-        self.subtitle_label.setFont(QFont("Segoe UI", 9))
+        self.subtitle_label.setFont(QFont("Arial", 9))
+        self.subtitle_label.setWordWrap(True)
         layout.addWidget(self.subtitle_label)
 
     def set_value(self, value: str):
@@ -74,24 +76,25 @@ class ProgressMetricCard(QFrame):
     def __init__(self, title: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setProperty("card", True)
-        self.setMinimumHeight(90)
+        self.setMinimumHeight(80)
+        self.setMinimumWidth(200)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_SM,
-                                  Sizes.PADDING_MD, Sizes.PADDING_SM)
-        layout.setSpacing(6)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(4)
 
         # Header row
         header = QHBoxLayout()
 
         self.title_label = QLabel(title)
         self.title_label.setProperty("muted", True)
+        self.title_label.setFont(QFont("Arial", 10))
         header.addWidget(self.title_label)
 
         header.addStretch()
 
         self.value_label = QLabel("0%")
-        self.value_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.value_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         self.value_label.setStyleSheet(f"color: {COLORS.success};")
         header.addWidget(self.value_label)
 
@@ -100,7 +103,8 @@ class ProgressMetricCard(QFrame):
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setMinimumHeight(12)
+        self.progress_bar.setMinimumHeight(10)
+        self.progress_bar.setMaximumHeight(12)
         self.progress_bar.setValue(0)
         layout.addWidget(self.progress_bar)
 
@@ -109,14 +113,14 @@ class ProgressMetricCard(QFrame):
 
         self.detail_left = QLabel("")
         self.detail_left.setProperty("muted", True)
-        self.detail_left.setFont(QFont("Segoe UI", 9))
+        self.detail_left.setFont(QFont("Arial", 9))
         details.addWidget(self.detail_left)
 
         details.addStretch()
 
         self.detail_right = QLabel("")
         self.detail_right.setProperty("muted", True)
-        self.detail_right.setFont(QFont("Segoe UI", 9))
+        self.detail_right.setFont(QFont("Arial", 9))
         details.addWidget(self.detail_right)
 
         layout.addLayout(details)
@@ -128,8 +132,8 @@ class ProgressMetricCard(QFrame):
         self.value_label.setText(f"{percent}%")
 
         if total > 0:
-            self.detail_left.setText(f"Da so tan: {current:,}")
-            self.detail_right.setText(f"Tong: {total:,}")
+            self.detail_left.setText(f"Đã sơ tán: {current:,}")
+            self.detail_right.setText(f"Tổng: {total:,}")
 
         # Color based on progress
         if value >= 0.8:
@@ -148,49 +152,56 @@ class ShelterStatusCard(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setProperty("card", True)
-        self.setMinimumHeight(100)
+        self.setMinimumHeight(70)
+        self.setMinimumWidth(180)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_SM,
-                                  Sizes.PADDING_MD, Sizes.PADDING_SM)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
         # Title
-        title = QLabel("Noi tru an")
+        title = QLabel("Nơi trú ẩn")
         title.setProperty("muted", True)
+        title.setFont(QFont("Arial", 10))
         layout.addWidget(title)
 
         # Stats row
         stats = QHBoxLayout()
+        stats.setSpacing(4)
 
         # Open shelters
         self.open_label = QLabel("0")
-        self.open_label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self.open_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         self.open_label.setStyleSheet(f"color: {COLORS.success};")
         stats.addWidget(self.open_label)
 
-        stats.addWidget(QLabel("/"))
+        slash = QLabel("/")
+        slash.setFont(QFont("Arial", 14))
+        stats.addWidget(slash)
 
         # Total shelters
         self.total_label = QLabel("0")
-        self.total_label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self.total_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         stats.addWidget(self.total_label)
 
-        stats.addWidget(QLabel(" dang hoat dong"))
+        active_label = QLabel(" hoạt động")
+        active_label.setFont(QFont("Arial", 10))
+        stats.addWidget(active_label)
 
         stats.addStretch()
         layout.addLayout(stats)
 
         # Capacity
-        self.capacity_label = QLabel("Suc chua con lai: 0")
+        self.capacity_label = QLabel("Sức chứa còn: 0")
         self.capacity_label.setProperty("muted", True)
+        self.capacity_label.setFont(QFont("Arial", 9))
         layout.addWidget(self.capacity_label)
 
     def update_status(self, open_count: int, total_count: int, remaining_capacity: int):
         """Cập nhật trạng thái nơi trú ẩn."""
         self.open_label.setText(str(open_count))
         self.total_label.setText(str(total_count))
-        self.capacity_label.setText(f"Suc chua con lai: {remaining_capacity:,}")
+        self.capacity_label.setText(f"Sức chứa còn: {remaining_capacity:,}")
 
         # Color based on availability
         if open_count == 0:
@@ -207,32 +218,29 @@ class TimeEstimateCard(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setProperty("card", True)
-        self.setMinimumHeight(80)
+        self.setMinimumHeight(70)
+        self.setMinimumWidth(180)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_SM,
-                                  Sizes.PADDING_MD, Sizes.PADDING_SM)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
 
         # Title
-        title = QLabel("Thoi gian uoc tinh")
+        title = QLabel("Thời gian ước tính")
         title.setProperty("muted", True)
+        title.setFont(QFont("Arial", 10))
         layout.addWidget(title)
 
         # Time display
-        time_row = QHBoxLayout()
-
         self.time_label = QLabel("0h 0m")
-        self.time_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        self.time_label.setFont(QFont("Arial", 18, QFont.Weight.Bold))
         self.time_label.setStyleSheet(f"color: {COLORS.cyan};")
-        time_row.addWidget(self.time_label)
-
-        time_row.addStretch()
-        layout.addLayout(time_row)
+        layout.addWidget(self.time_label)
 
         # Current time
-        self.current_label = QLabel("Thoi gian hien tai: 0h 0m")
+        self.current_label = QLabel("Hiện tại: 0h 0m")
         self.current_label.setProperty("muted", True)
+        self.current_label.setFont(QFont("Arial", 9))
         layout.addWidget(self.current_label)
 
     def update_time(self, current_hours: float, estimated_hours: float):
@@ -245,7 +253,7 @@ class TimeEstimateCard(QFrame):
         # Current time
         cur_h = int(current_hours)
         cur_m = int((current_hours - cur_h) * 60)
-        self.current_label.setText(f"Thoi gian hien tai: {cur_h}h {cur_m}m")
+        self.current_label.setText(f"Hiện tại: {cur_h}h {cur_m}m")
 
 
 class RouteStatusCard(QFrame):
@@ -254,50 +262,57 @@ class RouteStatusCard(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setProperty("card", True)
-        self.setMinimumHeight(80)
+        self.setMinimumHeight(70)
+        self.setMinimumWidth(200)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_SM,
-                                  Sizes.PADDING_MD, Sizes.PADDING_SM)
+        layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(4)
 
         # Title
-        title = QLabel("Tuyen duong")
+        title = QLabel("Tuyến đường")
         title.setProperty("muted", True)
+        title.setFont(QFont("Arial", 10))
         layout.addWidget(title)
 
-        # Stats grid
-        grid = QGridLayout()
-        grid.setSpacing(8)
+        # Stats row 1
+        row1 = QHBoxLayout()
+        row1.setSpacing(8)
 
-        # Active
-        grid.addWidget(QLabel("Dang chay:"), 0, 0)
+        row1.addWidget(QLabel("Đang chạy:"))
         self.active_label = QLabel("0")
-        self.active_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.active_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         self.active_label.setStyleSheet(f"color: {COLORS.success};")
-        grid.addWidget(self.active_label, 0, 1)
+        row1.addWidget(self.active_label)
 
-        # Completed
-        grid.addWidget(QLabel("Hoan thanh:"), 0, 2)
+        row1.addSpacing(12)
+
+        row1.addWidget(QLabel("Hoàn thành:"))
         self.completed_label = QLabel("0")
-        self.completed_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.completed_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         self.completed_label.setStyleSheet(f"color: {COLORS.primary};")
-        grid.addWidget(self.completed_label, 0, 3)
+        row1.addWidget(self.completed_label)
 
-        # Blocked
-        grid.addWidget(QLabel("Bi chan:"), 1, 0)
-        self.blocked_label = QLabel("0")
-        self.blocked_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        self.blocked_label.setStyleSheet(f"color: {COLORS.danger};")
-        grid.addWidget(self.blocked_label, 1, 1)
+        row1.addStretch()
+        layout.addLayout(row1)
 
-        layout.addLayout(grid)
+        # Stats row 2
+        row2 = QHBoxLayout()
+        row2.setSpacing(8)
+
+        row2.addWidget(QLabel("Rủi ro TB:"))
+        self.risk_label = QLabel("0%")
+        self.risk_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.risk_label.setStyleSheet(f"color: {COLORS.warning};")
+        row2.addWidget(self.risk_label)
+
+        row2.addStretch()
+        layout.addLayout(row2)
 
     def update_status(self, active: int, completed: int, blocked: int):
         """Cập nhật trạng thái tuyến đường."""
         self.active_label.setText(str(active))
         self.completed_label.setText(str(completed))
-        self.blocked_label.setText(str(blocked))
 
 
 class Dashboard(QWidget):
@@ -307,74 +322,78 @@ class Dashboard(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setMinimumHeight(Sizes.DASHBOARD_HEIGHT)
+        self.setMinimumHeight(150)
+        self.setMaximumHeight(200)
 
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(Sizes.PADDING_SM)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(4)
 
         # Title
-        title = QLabel("CHI SO THOI GIAN THUC")
+        title = QLabel("CHỈ SỐ THỜI GIAN THỰC")
         title.setProperty("heading", True)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         layout.addWidget(title)
 
-        # Cards grid
-        cards_layout = QGridLayout()
-        cards_layout.setSpacing(Sizes.PADDING_SM)
+        # Cards in horizontal layout with scroll
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setMaximumHeight(140)
 
-        # Row 1: Progress and Time
-        self.progress_card = ProgressMetricCard("Tien do so tan")
-        cards_layout.addWidget(self.progress_card, 0, 0)
+        cards_container = QWidget()
+        cards_layout = QHBoxLayout(cards_container)
+        cards_layout.setContentsMargins(0, 0, 0, 0)
+        cards_layout.setSpacing(8)
 
-        self.time_card = TimeEstimateCard()
-        cards_layout.addWidget(self.time_card, 0, 1)
+        # Progress card
+        self.progress_card = ProgressMetricCard("Tiến độ sơ tán")
+        cards_layout.addWidget(self.progress_card)
 
-        # Row 2: Evacuated and Routes
+        # Evacuated card
         self.evacuated_card = MetricCard(
-            "Da so tan",
+            "Đã sơ tán",
             "0",
-            "nguoi",
+            "người",
             COLORS.success
         )
-        cards_layout.addWidget(self.evacuated_card, 1, 0)
+        cards_layout.addWidget(self.evacuated_card)
 
-        self.routes_card = RouteStatusCard()
-        cards_layout.addWidget(self.routes_card, 1, 1)
+        # Time card
+        self.time_card = TimeEstimateCard()
+        cards_layout.addWidget(self.time_card)
 
-        # Row 3: Shelters and Risk
+        # Shelters card
         self.shelters_card = ShelterStatusCard()
-        cards_layout.addWidget(self.shelters_card, 2, 0)
+        cards_layout.addWidget(self.shelters_card)
 
+        # Routes card
+        self.routes_card = RouteStatusCard()
+        cards_layout.addWidget(self.routes_card)
+
+        # Risk card
         self.risk_card = MetricCard(
-            "Rui ro trung binh",
+            "Rủi ro TB",
             "0%",
-            "phan tram tiep xuc nguy hiem",
+            "tiếp xúc nguy hiểm",
             COLORS.warning
         )
-        cards_layout.addWidget(self.risk_card, 2, 1)
+        cards_layout.addWidget(self.risk_card)
 
-        layout.addLayout(cards_layout)
+        cards_layout.addStretch()
+
+        scroll.setWidget(cards_container)
+        layout.addWidget(scroll)
 
     def update_metrics(self, metrics: Dict[str, Any]):
         """
         Cập nhật tất cả các chỉ số từ dữ liệu mô phỏng.
-
-        Args:
-            metrics: Dictionary chứa các chỉ số:
-                - evacuation_progress: float (0-1)
-                - total_evacuated: int
-                - total_remaining: int
-                - current_time_hours: float
-                - estimated_completion_hours: float
-                - active_routes: int
-                - completed_routes: int
-                - blocked_routes: int
-                - shelter_utilization: dict
-                - average_risk_exposure: float
         """
         # Progress
         progress = metrics.get('evacuation_progress', 0)
@@ -385,7 +404,7 @@ class Dashboard(QWidget):
 
         # Evacuated
         self.evacuated_card.set_value(f"{evacuated:,}")
-        self.evacuated_card.set_subtitle(f"con lai: {remaining:,}")
+        self.evacuated_card.set_subtitle(f"còn: {remaining:,}")
 
         # Time
         current_time = metrics.get('current_time_hours', 0)

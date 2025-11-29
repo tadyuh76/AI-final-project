@@ -120,10 +120,17 @@ class Edge:
         if self.is_blocked:
             return float('inf')
 
-        time_cost = self.current_travel_time
-        risk_cost = self.flood_risk * self.length_km  # Rủi ro được cân nhắc theo khoảng cách
+        # Block high-risk edges completely
+        if self.flood_risk > 0.7:
+            return float('inf')
 
-        return time_cost + risk_weight * risk_cost
+        time_cost = self.current_travel_time
+
+        # Exponential penalty for flood risk - makes algorithm strongly avoid hazards
+        # At risk=0.5, penalty is ~26x; at risk=0.7, penalty is ~50x
+        risk_penalty = 1.0 + (self.flood_risk ** 2) * 100.0
+
+        return time_cost * risk_penalty
 
     def can_accept_flow(self, amount: int = 1) -> bool:
         """Kiểm tra xem cạnh có thể chấp nhận thêm luồng hay không."""

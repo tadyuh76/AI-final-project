@@ -166,6 +166,9 @@ class HybridGBFSGWO(BaseAlgorithm):
         # Theo dõi mức độ sử dụng nơi trú ẩn
         shelter_occupancy = {s.id: 0 for s in shelters}
 
+        # Track which zones got routes
+        zones_with_routes = set()
+
         # Xử lý từng khu vực
         for i, zone in enumerate(zones):
             if self._should_stop:
@@ -207,12 +210,53 @@ class HybridGBFSGWO(BaseAlgorithm):
                     )
                     plan.add_route(route)
                     shelter_occupancy[shelter.id] += actual_flow
+                    zones_with_routes.add(zone.id)
+                    break  # One route per zone
 
             # Báo cáo tiến trình
             iteration = self.gwo_iterations + i + 1
             self._metrics.convergence_history.append(self._calculate_plan_cost(plan))
             self.report_progress(iteration, self._calculate_plan_cost(plan),
                                {'phase': 'gbfs', 'zone': zone.id})
+
+        # FALLBACK: Ensure all zones have routes - find path to ANY safe shelter
+        for i, zone in enumerate(zones):
+            if zone.id in zones_with_routes:
+                continue
+
+            # Try to find path to any shelter with capacity
+            safe_shelters = [s for s in shelters
+                           if shelter_occupancy.get(s.id, 0) < s.capacity
+                           and self.network.get_total_risk_at(s.lat, s.lon) < 0.5]
+
+            if not safe_shelters:
+                # Fallback to any shelter with capacity
+                safe_shelters = [s for s in shelters
+                               if shelter_occupancy.get(s.id, 0) < s.capacity]
+
+            if safe_shelters:
+                path, found_shelter, cost = self.gbfs.find_path(zone, safe_shelters)
+
+                if path and found_shelter:
+                    available = found_shelter.capacity - shelter_occupancy.get(found_shelter.id, 0)
+                    actual_flow = min(zone.population, int(available))
+
+                    if actual_flow > 0:
+                        distance = self.gbfs._calculate_path_distance(path)
+                        time_hours = self.gbfs._calculate_path_time(path)
+                        risk = self.gbfs._calculate_path_risk(path)
+
+                        route = EvacuationRoute(
+                            zone_id=zone.id,
+                            shelter_id=found_shelter.id,
+                            path=path,
+                            flow=actual_flow,
+                            distance_km=distance,
+                            estimated_time_hours=time_hours,
+                            risk_score=risk
+                        )
+                        plan.add_route(route)
+                        shelter_occupancy[found_shelter.id] = shelter_occupancy.get(found_shelter.id, 0) + actual_flow
 
         return plan
 

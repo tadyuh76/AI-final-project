@@ -112,11 +112,8 @@ HCM_DISTRICTS: Dict[str, DistrictData] = {
         center_lat=10.6947, center_lon=106.7378,
         population=180000, area_km2=100.41, flood_risk=0.9  # Ven biển, rất dễ ngập lụt
     ),
-    'can_gio': DistrictData(
-        name='Can Gio', name_vi='Can Gio',
-        center_lat=10.4114, center_lon=106.9533,
-        population=75000, area_km2=704.22, flood_risk=0.95  # Khu vực rừng ngập mặn ven biển
-    ),
+    # Can Gio removed - too far from main HCM area (outside bounds)
+    # Would require separate evacuation planning due to geographic isolation
 }
 
 

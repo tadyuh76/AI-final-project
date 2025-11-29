@@ -94,13 +94,23 @@ class GreyWolfOptimizer(BaseAlgorithm):
                     zone.lat, zone.lon, shelter.lat, shelter.lon
                 )
 
-        # Tính trước ma trận rủi ro (dựa trên rủi ro tại điểm giữa đường đi)
+        # Tính trước ma trận rủi ro (kiểm tra nhiều điểm dọc theo đường đi)
         self._risk_matrix = np.zeros((self.n_zones, self.n_shelters))
         for i, zone in enumerate(self.zones):
             for j, shelter in enumerate(self.shelters):
-                mid_lat = (zone.lat + shelter.lat) / 2
-                mid_lon = (zone.lon + shelter.lon) / 2
-                self._risk_matrix[i, j] = self.network.get_total_risk_at(mid_lat, mid_lon)
+                # Check risk at multiple points along the route
+                max_risk = 0.0
+                for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
+                    lat = zone.lat + t * (shelter.lat - zone.lat)
+                    lon = zone.lon + t * (shelter.lon - zone.lon)
+                    risk = self.network.get_total_risk_at(lat, lon)
+                    max_risk = max(max_risk, risk)
+
+                # Also check if shelter is in hazard zone
+                shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
+                max_risk = max(max_risk, shelter_risk)
+
+                self._risk_matrix[i, j] = max_risk
 
     def _initialize_population(self) -> None:
         """Khởi tạo quần thể sói với các giải pháp ngẫu nhiên."""
@@ -160,8 +170,10 @@ class GreyWolfOptimizer(BaseAlgorithm):
         avg_speed = 30.0
         time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Chuẩn hóa
 
-        # 2. Chi phí rủi ro - chuẩn hóa
-        risk_cost = np.sum(flows * self._risk_matrix) / 1000.0
+        # 2. Chi phí rủi ro - HEAVILY penalize routes through hazard zones
+        # Block routes where risk > 0.7 by adding massive penalty
+        risk_penalty_matrix = np.where(self._risk_matrix > 0.7, 1000.0, self._risk_matrix * 10.0)
+        risk_cost = np.sum(flows * risk_penalty_matrix) / 1000.0
 
         # 3. Phạt vi phạm sức chứa - chuẩn hóa
         shelter_loads = flows.sum(axis=0)
@@ -311,36 +323,193 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Theo dõi mức độ sử dụng của nơi trú ẩn
         shelter_occupancy = np.zeros(self.n_shelters)
 
+        # Track zones that have been assigned
+        zone_assigned = [False] * self.n_zones
+
         for i, zone in enumerate(self.zones):
+            # Sort shelters by preference for this zone (lower risk, closer distance)
+            shelter_scores = []
             for j, shelter in enumerate(self.shelters):
-                flow = int(flows[i, j])
-
-                # Áp dụng ràng buộc sức chứa
+                risk = self._risk_matrix[i, j]
+                dist = self._distance_matrix[i, j]
+                flow = flows[i, j]
                 available = capacities[j] - shelter_occupancy[j]
-                actual_flow = min(flow, int(available))
 
-                if actual_flow >= self.config.min_flow_threshold:
-                    # Tạo đường đi trực tiếp đơn giản (GWO không thực hiện tìm đường)
-                    # Đường đi thực tế sẽ được tinh chỉnh bởi thuật toán hybrid hoặc GBFS
-                    path = [zone.id, shelter.id]
+                # Skip if no capacity or high risk route
+                if available < self.config.min_flow_threshold:
+                    continue
+                if risk > 0.5:  # Skip high-risk routes (more conservative)
+                    continue
 
-                    distance = self._distance_matrix[i, j]
-                    time_hours = distance / 30.0  # Giả sử 30 km/h
-                    risk = self._risk_matrix[i, j]
+                # Score: prefer higher flow, lower risk, closer distance
+                score = flow * 10 - risk * 100 - dist
+                shelter_scores.append((j, score, flow, available))
+
+            # Sort by score (higher is better)
+            shelter_scores.sort(key=lambda x: -x[1])
+
+            for j, score, flow, available in shelter_scores:
+                shelter = self.shelters[j]
+                actual_flow = min(int(flow), int(available))
+
+                if actual_flow < self.config.min_flow_threshold:
+                    continue
+
+                # Build path using network graph
+                path = self._find_path(zone, shelter)
+
+                distance = self._distance_matrix[i, j]
+                time_hours = distance / 30.0
+                risk = self._risk_matrix[i, j]
+
+                route = EvacuationRoute(
+                    zone_id=zone.id,
+                    shelter_id=shelter.id,
+                    path=path,
+                    flow=actual_flow,
+                    distance_km=distance,
+                    estimated_time_hours=time_hours,
+                    risk_score=risk
+                )
+                plan.add_route(route)
+                shelter_occupancy[j] += actual_flow
+                zone_assigned[i] = True
+                break  # One route per zone in basic GWO
+
+        # Ensure all zones have at least one route - assign to nearest safe shelter
+        for i, zone in enumerate(self.zones):
+            if zone_assigned[i]:
+                continue
+
+            # Find nearest safe shelter with capacity
+            best_shelter = None
+            best_dist = float('inf')
+            best_j = -1
+
+            for j, shelter in enumerate(self.shelters):
+                available = capacities[j] - shelter_occupancy[j]
+                if available < 100:  # Need at least some capacity
+                    continue
+
+                risk = self._risk_matrix[i, j]
+                if risk > 0.6:  # Skip high risk in fallback
+                    continue
+
+                dist = self._distance_matrix[i, j]
+                if dist < best_dist:
+                    best_dist = dist
+                    best_shelter = shelter
+                    best_j = j
+
+            if best_shelter is not None:
+                # Assign remaining population
+                available = capacities[best_j] - shelter_occupancy[best_j]
+                actual_flow = min(zone.population, int(available))
+
+                if actual_flow > 0:
+                    path = self._find_path(zone, best_shelter)
+                    risk = self._risk_matrix[i, best_j]
 
                     route = EvacuationRoute(
                         zone_id=zone.id,
-                        shelter_id=shelter.id,
+                        shelter_id=best_shelter.id,
                         path=path,
                         flow=actual_flow,
-                        distance_km=distance,
-                        estimated_time_hours=time_hours,
+                        distance_km=best_dist,
+                        estimated_time_hours=best_dist / 30.0,
                         risk_score=risk
                     )
                     plan.add_route(route)
-                    shelter_occupancy[j] += actual_flow
+                    shelter_occupancy[best_j] += actual_flow
 
         return plan
+
+    def _find_path(self, zone: PopulationZone, shelter: Shelter) -> List[str]:
+        """Find path through network from zone to shelter using A* with hazard avoidance."""
+        import heapq
+        from ..models.node import haversine_distance
+
+        # Find nearest network node to zone
+        zone_node = self.network.find_nearest_node(zone.lat, zone.lon)
+        # Find nearest network node to shelter
+        shelter_node = self.network.find_nearest_node(shelter.lat, shelter.lon)
+
+        if not zone_node or not shelter_node:
+            return [zone.id, shelter.id]
+
+        # A* search with hazard avoidance
+        # Priority queue: (f_cost, counter, node_id, path)
+        counter = 0
+        start_h = haversine_distance(zone_node.lat, zone_node.lon, shelter_node.lat, shelter_node.lon)
+        open_set = [(start_h, counter, zone_node.id, [zone.id, zone_node.id])]
+        visited = set()
+        g_costs = {zone_node.id: 0.0}
+
+        while open_set:
+            f_cost, _, current_id, path = heapq.heappop(open_set)
+
+            if current_id in visited:
+                continue
+            visited.add(current_id)
+
+            if current_id == shelter_node.id:
+                return path + [shelter.id]
+
+            current_node = self.network.get_node(current_id)
+            if not current_node:
+                continue
+
+            for neighbor_id in self.network.get_neighbors(current_id):
+                if neighbor_id in visited:
+                    continue
+
+                # Get edge and check for hazards
+                edge = self.network.get_edge_between(current_id, neighbor_id)
+                if not edge or edge.is_blocked:
+                    continue
+
+                # Skip high-risk edges completely
+                if edge.flood_risk > 0.7:
+                    continue
+
+                # Calculate cost with hazard penalty
+                edge_cost = edge.length_km
+                if edge.flood_risk > 0.3:
+                    edge_cost *= (1 + edge.flood_risk * 10)  # Penalty for moderate risk
+
+                new_g = g_costs[current_id] + edge_cost
+
+                if neighbor_id not in g_costs or new_g < g_costs[neighbor_id]:
+                    g_costs[neighbor_id] = new_g
+                    neighbor_node = self.network.get_node(neighbor_id)
+                    if neighbor_node:
+                        h = haversine_distance(neighbor_node.lat, neighbor_node.lon,
+                                              shelter_node.lat, shelter_node.lon)
+                        f = new_g + h
+                        counter += 1
+                        heapq.heappush(open_set, (f, counter, neighbor_id, path + [neighbor_id]))
+
+        # Fallback: try BFS without strict hazard avoidance
+        from collections import deque
+        visited = {zone_node.id}
+        queue = deque([(zone_node.id, [zone.id, zone_node.id])])
+
+        while queue:
+            current_id, path = queue.popleft()
+            if current_id == shelter_node.id:
+                return path + [shelter.id]
+
+            for neighbor_id in self.network.get_neighbors(current_id):
+                if neighbor_id in visited:
+                    continue
+                edge = self.network.get_edge_between(current_id, neighbor_id)
+                if edge and edge.is_blocked:
+                    continue
+                visited.add(neighbor_id)
+                queue.append((neighbor_id, path + [neighbor_id]))
+
+        # Last resort: direct path
+        return [zone.id, shelter.id]
 
     def get_flow_matrix(self) -> Optional[np.ndarray]:
         """Lấy ma trận phân phối luồng đã được tối ưu hóa."""

@@ -113,10 +113,12 @@ class OSMDataLoader:
         ox.settings.log_console = True
 
         # Tải xuống đồ thị
+        # OSMnx 2.x uses bbox=(west, south, east, north) = (left, bottom, right, top)
         print(f"  Đang tải xuống mạng lưới {network_type} cho ranh giới TP.HCM...")
+        print(f"  Tọa độ: N={HCM_BOUNDS['north']}, S={HCM_BOUNDS['south']}, E={HCM_BOUNDS['east']}, W={HCM_BOUNDS['west']}")
         G = ox.graph_from_bbox(
-            bbox=(HCM_BOUNDS['north'], HCM_BOUNDS['south'],
-                  HCM_BOUNDS['east'], HCM_BOUNDS['west']),
+            bbox=(HCM_BOUNDS['west'], HCM_BOUNDS['south'],
+                  HCM_BOUNDS['east'], HCM_BOUNDS['north']),
             network_type=network_type,
             simplify=simplify
         )

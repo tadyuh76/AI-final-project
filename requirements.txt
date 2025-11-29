@@ -1,0 +1,28 @@
+# SafeRoute HCM - Typhoon Evacuation Optimizer
+# Core Dependencies
+
+# UI Framework
+PyQt6>=6.6.0
+PyQt6-3D>=6.6.0
+
+# Graph and Data Processing
+networkx>=3.2
+numpy>=1.26.0
+pandas>=2.1.0
+
+# Real-time Plotting
+pyqtgraph>=0.13.3
+
+# OpenStreetMap Data
+osmnx>=1.7.0
+
+# Scientific Computing
+scipy>=1.11.0
+
+# Geospatial
+geopandas>=0.14.0
+shapely>=2.0.0
+pyproj>=3.6.0
+
+# Optional: Performance optimization
+# numba>=0.58.0

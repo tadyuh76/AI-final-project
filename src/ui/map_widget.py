@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsItem,
     QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsRectItem,
     QGraphicsTextItem, QGraphicsItemGroup, QWidget, QVBoxLayout,
-    QGraphicsPolygonItem, QHBoxLayout, QPushButton, QLabel, QFrame
+    QGraphicsPolygonItem, QHBoxLayout, QPushButton, QLabel, QFrame,
+    QCheckBox
 )
 from PyQt6.QtCore import (
     Qt, QPointF, QRectF, QTimer, pyqtSignal, QLineF
@@ -792,6 +793,11 @@ class MapCanvas(QGraphicsView):
         elif delta < 0:
             self.zoom_out()
 
+    def set_districts_visible(self, visible: bool):
+        """Ẩn/hiện ranh giới các quận."""
+        for item in self._district_items.values():
+            item.setVisible(visible)
+
 
 class MapWidget(QWidget):
     """Widget container cho bản đồ với controls."""
@@ -882,10 +888,31 @@ class MapWidget(QWidget):
         hazard_legend.setStyleSheet(f"color: {COLORS.danger}; font-size: 10px;")
         toolbar_layout.addWidget(hazard_legend)
 
-        # Dashed circle = district
-        district_legend = QLabel("◯ Ranh giới quận")
-        district_legend.setStyleSheet(f"color: {COLORS.text_muted}; font-size: 10px;")
-        toolbar_layout.addWidget(district_legend)
+        # Dashed circle = district (with checkbox to toggle)
+        self.district_checkbox = QCheckBox("◯ Ranh giới quận")
+        self.district_checkbox.setChecked(True)
+        self.district_checkbox.setStyleSheet(f"""
+            QCheckBox {{
+                color: {COLORS.text_muted};
+                font-size: 10px;
+            }}
+            QCheckBox::indicator {{
+                width: 12px;
+                height: 12px;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {COLORS.primary};
+                border: 1px solid {COLORS.primary_dark};
+                border-radius: 2px;
+            }}
+            QCheckBox::indicator:unchecked {{
+                background-color: {COLORS.surface};
+                border: 1px solid {COLORS.border};
+                border-radius: 2px;
+            }}
+        """)
+        self.district_checkbox.stateChanged.connect(self._on_district_toggle)
+        toolbar_layout.addWidget(self.district_checkbox)
 
         toolbar_layout.addStretch()
 
@@ -909,6 +936,11 @@ class MapWidget(QWidget):
 
     def _on_fit(self):
         self.canvas.fit_to_view()
+
+    def _on_district_toggle(self, state: int):
+        """Xử lý khi checkbox ranh giới quận thay đổi."""
+        visible = state == Qt.CheckState.Checked.value
+        self.canvas.set_districts_visible(visible)
 
     def set_network(self, network: EvacuationNetwork):
         """Thiết lập mạng lưới."""

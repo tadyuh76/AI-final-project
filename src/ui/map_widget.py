@@ -24,6 +24,7 @@ from PyQt6.QtGui import (
 from .styles import COLORS, hex_to_rgb, Animation, MapStyle, Sizes
 from ..models.network import EvacuationNetwork
 from ..models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from ..data.hcm_data import HCM_DISTRICTS, DistrictData
 
 
 def hex_to_qcolor(hex_color: str, alpha: int = 255) -> QColor:
@@ -39,31 +40,59 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         super().__init__(-size/2, -size/2, size, size)
         self.zone = zone
         self.base_size = size
+        self._is_selected = False
 
         self.setPos(x, y)
         self.setZValue(10)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
 
         # Styling
         color = hex_to_qcolor(COLORS.cyan, 200)
         self.setBrush(QBrush(color))
         self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
 
-        self.setToolTip(
-            f"<b>{zone.name or zone.id}</b><br>"
-            f"Dân số: {zone.population:,}<br>"
-            f"Quận: {zone.district_name}"
-        )
+        self._update_tooltip()
         self.setAcceptHoverEvents(True)
+
+    def _update_tooltip(self):
+        """Cập nhật tooltip với thông tin chi tiết."""
+        progress = self.zone.evacuation_progress
+        status = "✓ Đã sơ tán" if progress >= 0.9 else "⏳ Đang sơ tán" if progress > 0 else "⬤ Chờ sơ tán"
+        self.setToolTip(
+            f"<b style='font-size:14px;'>{self.zone.name or self.zone.id}</b><br>"
+            f"<hr>"
+            f"<b>Quận:</b> {self.zone.district_name}<br>"
+            f"<b>Dân số:</b> {self.zone.population:,} người<br>"
+            f"<b>Đã sơ tán:</b> {self.zone.evacuated:,} ({progress:.0%})<br>"
+            f"<b>Còn lại:</b> {self.zone.remaining_population:,} người<br>"
+            f"<b>Trạng thái:</b> {status}<br>"
+            f"<hr>"
+            f"<i>Tọa độ: {self.zone.lat:.4f}, {self.zone.lon:.4f}</i>"
+        )
 
     def hoverEnterEvent(self, event):
         self.setPen(QPen(hex_to_qcolor(COLORS.primary), 3))
         self.setScale(1.3)
+        self._update_tooltip()
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
-        self.setScale(1.0)
+        if not self._is_selected:
+            self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
+            self.setScale(1.0)
         super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Xử lý click để hiển thị thông tin chi tiết."""
+        self._is_selected = not self._is_selected
+        if self._is_selected:
+            self.setPen(QPen(hex_to_qcolor(COLORS.primary), 4))
+            self.setScale(1.4)
+        else:
+            self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
+            self.setScale(1.0)
+        self._update_tooltip()
+        super().mousePressEvent(event)
 
     def update_progress(self, evacuated: int):
         """Cập nhật hiển thị tiến độ sơ tán."""
@@ -78,18 +107,32 @@ class PopulationZoneItem(QGraphicsEllipseItem):
             color = hex_to_qcolor(COLORS.cyan, 200)
 
         self.setBrush(QBrush(color))
+        self._update_tooltip()
 
 
 class ShelterItem(QGraphicsRectItem):
     """Hiển thị nơi trú ẩn trên bản đồ."""
 
+    # Tên loại điểm trú ẩn bằng tiếng Việt
+    SHELTER_TYPE_NAMES = {
+        'stadium': '🏟️ Sân vận động',
+        'university': '🎓 Trường đại học',
+        'hospital': '🏥 Bệnh viện',
+        'convention': '🏛️ Trung tâm hội nghị',
+        'school': '🏫 Trường học',
+        'religious': '⛪ Công trình tôn giáo',
+        'mall': '🛒 Trung tâm thương mại',
+    }
+
     def __init__(self, shelter: Shelter, x: float, y: float, size: float):
         super().__init__(-size/2, -size/2, size, size)
         self.shelter = shelter
         self.base_size = size
+        self._is_selected = False
 
         self.setPos(x, y)
         self.setZValue(15)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
 
         self.setBrush(QBrush(hex_to_qcolor(COLORS.success, 220)))
         self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
@@ -98,21 +141,46 @@ class ShelterItem(QGraphicsRectItem):
         self.setAcceptHoverEvents(True)
 
     def _update_tooltip(self):
+        rate = self.shelter.occupancy_rate
+        status_icon = "🔴 Đầy" if rate >= 0.9 else "🟡 Gần đầy" if rate >= 0.7 else "🟢 Còn chỗ"
+        shelter_type_name = self.SHELTER_TYPE_NAMES.get(
+            self.shelter.shelter_type, self.shelter.shelter_type
+        )
         self.setToolTip(
-            f"<b>{self.shelter.name or self.shelter.id}</b><br>"
-            f"Loại: {self.shelter.shelter_type}<br>"
-            f"Sức chứa: {self.shelter.current_occupancy:,}/{self.shelter.capacity:,}"
+            f"<b style='font-size:14px;'>{self.shelter.name or self.shelter.id}</b><br>"
+            f"<hr>"
+            f"<b>Loại:</b> {shelter_type_name}<br>"
+            f"<b>Sức chứa tối đa:</b> {self.shelter.capacity:,} người<br>"
+            f"<b>Hiện tại:</b> {self.shelter.current_occupancy:,} ({rate:.0%})<br>"
+            f"<b>Còn trống:</b> {self.shelter.available_capacity:,} người<br>"
+            f"<b>Trạng thái:</b> {status_icon}<br>"
+            f"<hr>"
+            f"<i>Tọa độ: {self.shelter.lat:.4f}, {self.shelter.lon:.4f}</i>"
         )
 
     def hoverEnterEvent(self, event):
         self.setPen(QPen(hex_to_qcolor(COLORS.primary), 3))
         self.setScale(1.3)
+        self._update_tooltip()
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
-        self.setScale(1.0)
+        if not self._is_selected:
+            self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
+            self.setScale(1.0)
         super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Xử lý click để hiển thị thông tin chi tiết."""
+        self._is_selected = not self._is_selected
+        if self._is_selected:
+            self.setPen(QPen(hex_to_qcolor(COLORS.primary), 4))
+            self.setScale(1.4)
+        else:
+            self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
+            self.setScale(1.0)
+        self._update_tooltip()
+        super().mousePressEvent(event)
 
     def update_occupancy(self, occupancy: int):
         """Cập nhật hiển thị mức lấp đầy."""
@@ -188,6 +256,78 @@ class HazardZoneItem(QGraphicsEllipseItem):
         self.setRect(-radius_pixels, -radius_pixels,
                      radius_pixels * 2, radius_pixels * 2)
         self._update_appearance()
+
+
+# Màu sắc khác nhau cho từng quận
+DISTRICT_COLORS = [
+    '#FF6B6B',  # Đỏ san hô
+    '#4ECDC4',  # Xanh ngọc
+    '#45B7D1',  # Xanh da trời
+    '#96CEB4',  # Xanh lá nhạt
+    '#FFEAA7',  # Vàng nhạt
+    '#DDA0DD',  # Tím nhạt
+    '#98D8C8',  # Xanh bạc hà
+    '#F7DC6F',  # Vàng chanh
+    '#BB8FCE',  # Tím oải hương
+    '#85C1E9',  # Xanh dương nhạt
+    '#F8B500',  # Vàng cam
+    '#76D7C4',  # Xanh ngọc lam
+    '#F1948A',  # Hồng san hô
+    '#82E0AA',  # Xanh lá cây
+    '#D7BDE2',  # Tím hồng
+    '#AED6F1',  # Xanh pastel
+    '#FAD7A0',  # Cam nhạt
+    '#A9DFBF',  # Xanh mint
+]
+
+
+class DistrictBorderItem(QGraphicsEllipseItem):
+    """Hiển thị viền quận trên bản đồ."""
+
+    def __init__(self, district_id: str, district: DistrictData,
+                 x: float, y: float, radius_pixels: float, color: QColor):
+        super().__init__(-radius_pixels, -radius_pixels,
+                         radius_pixels * 2, radius_pixels * 2)
+        self.district_id = district_id
+        self.district = district
+
+        self.setPos(x, y)
+        self.setZValue(2)  # Phía trên đường, dưới hazard
+
+        # Style: chỉ viền, không fill đặc
+        self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
+        self.setPen(QPen(color, 2, Qt.PenStyle.DashLine))
+
+        self.setToolTip(
+            f"<b>{district.name_vi}</b><br>"
+            f"Dân số: {district.population:,}<br>"
+            f"Diện tích: {district.area_km2:.1f} km²<br>"
+            f"Rủi ro ngập: {district.flood_risk:.0%}"
+        )
+        self.setAcceptHoverEvents(True)
+
+        # Thêm nhãn tên quận
+        self._label = QGraphicsTextItem(district.name_vi, self)
+        self._label.setDefaultTextColor(color)
+        font = QFont()
+        font.setPointSize(8)
+        font.setBold(True)
+        self._label.setFont(font)
+        # Căn giữa nhãn
+        label_rect = self._label.boundingRect()
+        self._label.setPos(-label_rect.width() / 2, -radius_pixels - label_rect.height() - 5)
+
+    def hoverEnterEvent(self, event):
+        color = self.pen().color()
+        self.setPen(QPen(color, 3, Qt.PenStyle.SolidLine))
+        self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 60)))
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        color = self.pen().color()
+        self.setPen(QPen(color, 2, Qt.PenStyle.DashLine))
+        self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
+        super().hoverLeaveEvent(event)
 
 
 class RouteItem(QGraphicsPathItem):
@@ -322,6 +462,7 @@ class MapCanvas(QGraphicsView):
         self._zone_items: Dict[str, PopulationZoneItem] = {}
         self._shelter_items: Dict[str, ShelterItem] = {}
         self._hazard_items: Dict[int, HazardZoneItem] = {}
+        self._district_items: Dict[str, DistrictBorderItem] = {}
         self._route_items: Dict[str, RouteItem] = {}
         self._particles: List[EvacueeParticle] = []
         self._particle_pool: List[EvacueeParticle] = []
@@ -383,6 +524,7 @@ class MapCanvas(QGraphicsView):
         self._zone_items.clear()
         self._shelter_items.clear()
         self._hazard_items.clear()
+        self._district_items.clear()
         self._route_items.clear()
         self._particles.clear()
 
@@ -397,14 +539,38 @@ class MapCanvas(QGraphicsView):
         if not self._network:
             return
 
-        # 1. Vẽ các cạnh (đường)
+        # 1. Vẽ viền các quận (nền)
+        self._draw_districts()
+
+        # 2. Vẽ các cạnh (đường)
         self._draw_edges()
 
-        # 2. Vẽ vùng nguy hiểm
+        # 3. Vẽ vùng nguy hiểm
         self._draw_hazards()
 
-        # 3. Vẽ các nút
+        # 4. Vẽ các nút
         self._draw_nodes()
+
+    def _draw_districts(self):
+        """Vẽ viền các quận từ dữ liệu HCM_DISTRICTS."""
+        for i, (district_id, district) in enumerate(HCM_DISTRICTS.items()):
+            pos = self._lat_lon_to_pixel(district.center_lat, district.center_lon)
+
+            # Tính bán kính từ diện tích (giả sử hình tròn)
+            # area = pi * r^2 => r = sqrt(area / pi)
+            radius_km = math.sqrt(district.area_km2 / math.pi)
+            # Chuyển đổi km sang pixels (1 độ ≈ 111km)
+            radius_pixels = radius_km * self._scale_factor / 111.0
+
+            # Chọn màu từ bảng màu
+            color_hex = DISTRICT_COLORS[i % len(DISTRICT_COLORS)]
+            color = hex_to_qcolor(color_hex)
+
+            item = DistrictBorderItem(
+                district_id, district, pos.x(), pos.y(), radius_pixels, color
+            )
+            self._scene.addItem(item)
+            self._district_items[district_id] = item
 
     def _draw_edges(self):
         """Vẽ các đường trong mạng lưới."""
@@ -715,6 +881,11 @@ class MapWidget(QWidget):
         hazard_legend = QLabel("◉ Vùng nguy hiểm")
         hazard_legend.setStyleSheet(f"color: {COLORS.danger}; font-size: 10px;")
         toolbar_layout.addWidget(hazard_legend)
+
+        # Dashed circle = district
+        district_legend = QLabel("◯ Ranh giới quận")
+        district_legend.setStyleSheet(f"color: {COLORS.text_muted}; font-size: 10px;")
+        toolbar_layout.addWidget(district_legend)
 
         toolbar_layout.addStretch()
 

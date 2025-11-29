@@ -298,9 +298,12 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             total_path_length / paths_found if paths_found > 0 else 0
         )
 
+        # Coverage rate: evacuees covered / min(total_population, total_capacity)
         total_population = sum(z.population for z in zones)
+        total_capacity = sum(s.capacity for s in shelters)
+        max_possible = min(total_population, total_capacity)
         self._metrics.coverage_rate = (
-            plan.total_evacuees / total_population if total_population > 0 else 0
+            plan.total_evacuees / max_possible if max_possible > 0 else 0
         )
 
         return plan, self._metrics

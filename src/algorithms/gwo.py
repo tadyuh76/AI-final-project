@@ -141,36 +141,46 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Get population array
         populations = np.array([z.population for z in self.zones])
         capacities = np.array([s.capacity for s in self.shelters])
+        total_capacity = capacities.sum()
+
+        # Limit populations to total shelter capacity for realistic optimization
+        # Scale down proportionally if population exceeds capacity
+        total_pop = populations.sum()
+        if total_pop > total_capacity:
+            scale_factor = total_capacity / total_pop
+            effective_populations = populations * scale_factor
+        else:
+            effective_populations = populations
 
         # Calculate actual flows
-        flows = position * populations[:, np.newaxis]
+        flows = position * effective_populations[:, np.newaxis]
 
-        # 1. Time cost (flow * distance / speed)
+        # 1. Time cost (flow * distance / speed) - normalized
         # Assume average speed of 30 km/h
         avg_speed = 30.0
-        time_cost = np.sum(flows * self._distance_matrix / avg_speed)
+        time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Normalize
 
-        # 2. Risk cost
-        risk_cost = np.sum(flows * self._risk_matrix) * 100  # Scale up risk
+        # 2. Risk cost - normalized
+        risk_cost = np.sum(flows * self._risk_matrix) / 1000.0
 
-        # 3. Capacity violation penalty
+        # 3. Capacity violation penalty - normalized
         shelter_loads = flows.sum(axis=0)
         capacity_violations = np.maximum(0, shelter_loads - capacities)
-        capacity_penalty = np.sum(capacity_violations ** 2) * 1000
+        capacity_penalty = np.sum(capacity_violations / (capacities + 1)) * 10  # Relative violation
 
         # 4. Flow balance penalty (prefer even distribution)
         if capacities.sum() > 0:
-            utilization = shelter_loads / capacities
-            balance_penalty = np.std(utilization) * 50
+            utilization = shelter_loads / (capacities + 1)
+            balance_penalty = np.std(utilization) * 5
         else:
             balance_penalty = 0
 
-        # 5. Coverage penalty (penalize if not all population is assigned)
+        # 5. Coverage penalty - use effective population
         total_flow = flows.sum()
-        total_population = populations.sum()
-        if total_population > 0:
-            coverage = total_flow / total_population
-            coverage_penalty = (1 - coverage) ** 2 * 500
+        total_effective = effective_populations.sum()
+        if total_effective > 0:
+            coverage = total_flow / total_effective
+            coverage_penalty = (1 - coverage) ** 2 * 10
         else:
             coverage_penalty = 0
 
@@ -270,9 +280,12 @@ class GreyWolfOptimizer(BaseAlgorithm):
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
 
+        # Coverage rate: evacuees covered / min(total_population, total_capacity)
         total_population = sum(z.population for z in self.zones)
+        total_capacity = sum(s.capacity for s in self.shelters)
+        max_possible = min(total_population, total_capacity)
         self._metrics.coverage_rate = (
-            plan.total_evacuees / total_population if total_population > 0 else 0
+            plan.total_evacuees / max_possible if max_possible > 0 else 0
         )
 
         return plan, self._metrics

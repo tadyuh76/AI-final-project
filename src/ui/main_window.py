@@ -132,6 +132,7 @@ class SimulationWorker(QThread):
         """Chạy mô phỏng trong thread riêng."""
         try:
             self.engine.initialize(self.plan)
+            self.engine.start()  # Set state to RUNNING
 
             while not self._should_stop and not self._is_completed():
                 while self._is_paused and not self._should_stop:
@@ -538,10 +539,17 @@ class MainWindow(QMainWindow):
     @pyqtSlot(dict)
     def _on_simulation_step(self, metrics: Dict[str, Any]):
         """Xử lý cập nhật từng bước mô phỏng."""
-        self.dashboard.update_metrics(metrics)
+        # Calculate remaining shelter capacity from network
+        if self._network:
+            shelter_arrivals = metrics.get('shelter_arrivals', {})
+            total_capacity = 0
+            total_arrivals = 0
+            for shelter in self._network.get_active_shelters():
+                total_capacity += shelter.capacity
+                total_arrivals += shelter_arrivals.get(shelter.id, 0)
+            metrics['remaining_shelter_capacity'] = max(0, total_capacity - total_arrivals)
 
-        # Update map visualization
-        # (In a full implementation, we'd update zone progress and shelter occupancy here)
+        self.dashboard.update_metrics(metrics)
 
     @pyqtSlot(object)
     def _on_simulation_completed(self, metrics: SimulationMetrics):

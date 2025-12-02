@@ -309,10 +309,19 @@ class RouteStatusCard(QFrame):
         row2.addStretch()
         layout.addLayout(row2)
 
-    def update_status(self, active: int, completed: int, blocked: int):
+    def update_status(self, active: int, completed: int, blocked: int, avg_risk: float = 0.0):
         """Cập nhật trạng thái tuyến đường."""
         self.active_label.setText(str(active))
         self.completed_label.setText(str(completed))
+        self.risk_label.setText(f"{avg_risk:.0%}")
+
+        # Color based on risk level
+        if avg_risk > 0.5:
+            self.risk_label.setStyleSheet(f"color: {COLORS.danger};")
+        elif avg_risk > 0.3:
+            self.risk_label.setStyleSheet(f"color: {COLORS.warning};")
+        else:
+            self.risk_label.setStyleSheet(f"color: {COLORS.success};")
 
 
 class Dashboard(QWidget):
@@ -411,14 +420,14 @@ class Dashboard(QWidget):
         est_time = metrics.get('estimated_completion_hours', 0)
         self.time_card.update_time(current_time, est_time)
 
-        # Routes
+        # Routes with risk
         active = metrics.get('active_routes', 0)
         completed = metrics.get('completed_routes', 0)
         blocked = metrics.get('blocked_routes', 0)
-        self.routes_card.update_status(active, completed, blocked)
-
-        # Risk
         risk = metrics.get('average_risk_exposure', 0)
+        self.routes_card.update_status(active, completed, blocked, risk)
+
+        # Risk card
         self.risk_card.set_value(f"{risk:.0%}")
         if risk > 0.5:
             self.risk_card.set_color(COLORS.danger)
@@ -426,6 +435,18 @@ class Dashboard(QWidget):
             self.risk_card.set_color(COLORS.warning)
         else:
             self.risk_card.set_color(COLORS.success)
+
+        # Shelter status from arrivals data
+        shelter_arrivals = metrics.get('shelter_arrivals', {})
+        shelter_utilization = metrics.get('shelter_utilization', {})
+        if shelter_arrivals or shelter_utilization:
+            total_shelters = len(shelter_utilization) if shelter_utilization else len(shelter_arrivals)
+            # Count open shelters (utilization < 100%)
+            open_shelters = sum(1 for util in shelter_utilization.values() if util < 1.0) if shelter_utilization else total_shelters
+            # Sum remaining capacity (estimated from utilization)
+            total_arrivals = sum(shelter_arrivals.values()) if shelter_arrivals else 0
+            remaining_capacity = metrics.get('remaining_shelter_capacity', 0)
+            self.shelters_card.update_status(open_shelters, total_shelters, remaining_capacity)
 
     def update_shelter_status(self, open_count: int, total_count: int, remaining_capacity: int):
         """Cập nhật trạng thái nơi trú ẩn."""

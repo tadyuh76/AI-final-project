@@ -86,7 +86,9 @@ class SimulationMetrics:
             'evacuation_progress': self.evacuation_progress,
             'estimated_completion_hours': self.estimated_completion_hours,
             'average_travel_time': self.average_travel_time,
-            'shelter_utilization': self.shelter_utilization
+            'average_risk_exposure': self.average_risk_exposure,
+            'shelter_utilization': self.shelter_utilization,
+            'shelter_arrivals': self.shelter_arrivals
         }
 
 
@@ -226,6 +228,10 @@ class SimulationEngine:
         for shelter in self.network.get_shelters():
             self._metrics.shelter_utilization[shelter.id] = 0.0
             self._metrics.shelter_arrivals[shelter.id] = 0
+
+    def start(self) -> None:
+        """Bắt đầu mô phỏng (chuyển trạng thái sang RUNNING)."""
+        self._state = SimulationState.RUNNING
 
     def run(self, plan: EvacuationPlan,
             real_time: bool = False) -> SimulationMetrics:

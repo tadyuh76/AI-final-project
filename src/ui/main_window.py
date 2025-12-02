@@ -239,11 +239,11 @@ class MainWindow(QMainWindow):
         self.dashboard = Dashboard()
         map_layout.addWidget(self.dashboard, 1)
 
-        self.tab_widget.addTab(map_tab, "Ban do")
+        self.tab_widget.addTab(map_tab, "Bản đồ")
 
         # Tab 2: Comparison View
         self.comparison_view = ComparisonView()
-        self.tab_widget.addTab(self.comparison_view, "So sanh Thuat toan")
+        self.tab_widget.addTab(self.comparison_view, "So sánh Thuật toán")
 
         content_layout.addWidget(self.tab_widget)
 

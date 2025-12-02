@@ -59,10 +59,10 @@ class ConvergenceChart(QWidget):
 
             # Create plot widget
             self.plot_widget = pg.PlotWidget()
-            self.plot_widget.setLabel('left', 'Chi phi')
-            self.plot_widget.setLabel('bottom', 'Vong lap')
+            self.plot_widget.setLabel('left', 'Chi phí')
+            self.plot_widget.setLabel('bottom', 'Vòng lặp')
             self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-            self.plot_widget.setTitle('Bieu do Hoi tu')
+            self.plot_widget.setTitle('Biểu đồ Hội tụ')
 
             # Legend
             self.plot_widget.addLegend(offset=(60, 30))
@@ -73,7 +73,7 @@ class ConvergenceChart(QWidget):
             layout.addWidget(self.plot_widget)
         else:
             # Fallback: simple label
-            label = QLabel("Cai dat pyqtgraph de xem bieu do\npip install pyqtgraph")
+            label = QLabel("Cài đặt pyqtgraph để xem biểu đồ\npip install pyqtgraph")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label.setStyleSheet(f"color: {COLORS.text_muted}; padding: 40px;")
             layout.addWidget(label)
@@ -130,17 +130,17 @@ class PerformanceTable(QTableWidget):
 
         # Setup table
         self.setColumnCount(4)
-        self.setHorizontalHeaderLabels(['Chi so', 'GBFS', 'GWO', 'Hybrid'])
+        self.setHorizontalHeaderLabels(['Chỉ số', 'GBFS', 'GWO', 'Hybrid'])
 
         # Rows
         metrics = [
-            'Thoi gian (s)',
-            'Chi phi',
-            'Tuyen duong',
-            'Nguoi so tan',
-            'Ty le bao phu',
-            'Do dai TB',
-            'Vong lap'
+            'Thời gian (s)',
+            'Chi phí',
+            'Tuyến đường',
+            'Người sơ tán',
+            'Tỷ lệ bao phủ',
+            'Độ dài TB',
+            'Vòng lặp'
         ]
         self.setRowCount(len(metrics))
         for i, metric in enumerate(metrics):
@@ -222,7 +222,7 @@ class RadarChart(QWidget):
         self.setMinimumSize(200, 200)
 
         self._data: Dict[str, List[float]] = {}
-        self._labels = ['Toc do', 'An toan', 'Bao phu', 'Can bang', 'Hieu qua']
+        self._labels = ['Tốc độ', 'An toàn', 'Bao phủ', 'Cân bằng', 'Hiệu quả']
         self._colors = {
             'gbfs': COLORS.success,
             'gwo': COLORS.purple,
@@ -360,7 +360,7 @@ class MiniMapComparison(QWidget):
             frame_layout.addWidget(label)
 
             # Placeholder for mini map
-            placeholder = QLabel("Click de xem")
+            placeholder = QLabel("Click để xem")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             placeholder.setProperty("muted", True)
             frame_layout.addWidget(placeholder)
@@ -392,7 +392,7 @@ class WinnerBadge(QFrame):
         # Winner info
         info_layout = QVBoxLayout()
 
-        self.title_label = QLabel("THUAT TOAN CHIEN THANG")
+        self.title_label = QLabel("THUẬT TOÁN CHIẾN THẮNG")
         self.title_label.setProperty("muted", True)
         info_layout.addWidget(self.title_label)
 
@@ -401,7 +401,7 @@ class WinnerBadge(QFrame):
         self.winner_label.setStyleSheet(f"color: {COLORS.success};")
         info_layout.addWidget(self.winner_label)
 
-        self.score_label = QLabel("Diem: --")
+        self.score_label = QLabel("Điểm: --")
         self.score_label.setProperty("muted", True)
         info_layout.addWidget(self.score_label)
 
@@ -411,10 +411,10 @@ class WinnerBadge(QFrame):
     def set_winner(self, algorithm: str, score: float, improvement: float = 0):
         """Cập nhật thuật toán chiến thắng."""
         self.winner_label.setText(algorithm.upper())
-        self.score_label.setText(f"Diem: {score:.3f}")
+        self.score_label.setText(f"Điểm: {score:.3f}")
 
         if improvement > 0:
-            self.score_label.setText(f"Diem: {score:.3f} (+{improvement:.0%} tot hon)")
+            self.score_label.setText(f"Điểm: {score:.3f} (+{improvement:.0%} tốt hơn)")
 
 
 class ComparisonView(QWidget):
@@ -434,7 +434,7 @@ class ComparisonView(QWidget):
         layout.setSpacing(Sizes.PADDING_MD)
 
         # Title
-        title = QLabel("SO SANH THUAT TOAN")
+        title = QLabel("SO SÁNH THUẬT TOÁN")
         title.setProperty("heading", True)
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -453,7 +453,7 @@ class ComparisonView(QWidget):
         left_layout.setSpacing(Sizes.PADDING_SM)
 
         # Convergence chart
-        convergence_label = QLabel("Bieu do Hoi tu")
+        convergence_label = QLabel("Biểu đồ Hội tụ")
         convergence_label.setProperty("subheading", True)
         left_layout.addWidget(convergence_label)
 
@@ -461,7 +461,7 @@ class ComparisonView(QWidget):
         left_layout.addWidget(self.convergence_chart, 2)
 
         # Radar chart
-        radar_label = QLabel("Bieu do Radar")
+        radar_label = QLabel("Biểu đồ Radar")
         radar_label.setProperty("subheading", True)
         left_layout.addWidget(radar_label)
 
@@ -476,7 +476,7 @@ class ComparisonView(QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(Sizes.PADDING_SM)
 
-        table_label = QLabel("Bang Hieu suat")
+        table_label = QLabel("Bảng Hiệu suất")
         table_label.setProperty("subheading", True)
         right_layout.addWidget(table_label)
 
@@ -484,7 +484,7 @@ class ComparisonView(QWidget):
         right_layout.addWidget(self.performance_table)
 
         # Mini maps
-        mini_label = QLabel("So sanh Ket qua")
+        mini_label = QLabel("So sánh Kết quả")
         mini_label.setProperty("subheading", True)
         right_layout.addWidget(mini_label)
 

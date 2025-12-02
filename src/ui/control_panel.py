@@ -10,16 +10,43 @@ from PyQt6.QtWidgets import (
     QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 
 from .styles import COLORS, Sizes, hex_to_rgb
 
-
 def hex_to_qcolor(hex_color: str, alpha: int = 255):
     """Chuyển đổi hex sang QColor."""
-    from PyQt6.QtGui import QColor
     r, g, b = hex_to_rgb(hex_color)
     return QColor(r, g, b, alpha)
+
+
+class StyledCheckBox(QCheckBox):
+    """Checkbox với dấu tích bên trong."""
+
+    def __init__(self, text: str, parent: Optional[QWidget] = None):
+        super().__init__(text, parent)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        if self.isChecked():
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Draw checkmark inside the indicator
+            pen = QPen(QColor(255, 255, 255), 2)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+
+            # Calculate checkmark position (inside the 18x18 indicator)
+            x = 4
+            y = 4
+            # Draw checkmark path
+            painter.drawLine(x + 3, y + 8, x + 6, y + 11)
+            painter.drawLine(x + 6, y + 11, x + 12, y + 5)
+
+            painter.end()
 
 
 class LabeledSlider(QWidget):
@@ -351,19 +378,19 @@ class ControlPanel(QWidget):
         sim_layout.addWidget(self.speed_slider)
 
         # Checkbox options
-        self.show_particles = QCheckBox("Hiển thị hạt di chuyển")
+        self.show_particles = StyledCheckBox("Hiển thị hạt di chuyển")
         self.show_particles.setChecked(True)
         self.show_particles.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_particles)
         sim_layout.addSpacing(4)
 
-        self.show_routes = QCheckBox("Hiển thị tuyến đường")
+        self.show_routes = StyledCheckBox("Hiển thị tuyến đường")
         self.show_routes.setChecked(True)
         self.show_routes.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_routes)
         sim_layout.addSpacing(4)
 
-        self.show_hazards = QCheckBox("Hiển thị vùng nguy hiểm")
+        self.show_hazards = StyledCheckBox("Hiển thị vùng nguy hiểm")
         self.show_hazards.setChecked(True)
         self.show_hazards.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_hazards)

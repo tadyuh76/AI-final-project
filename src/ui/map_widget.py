@@ -23,6 +23,7 @@ from PyQt6.QtGui import (
 )
 
 from .styles import COLORS, hex_to_rgb, Animation, MapStyle, Sizes
+from .control_panel import StyledCheckBox
 from ..models.network import EvacuationNetwork
 from ..models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
 from ..data.hcm_data import HCM_DISTRICTS, DistrictData
@@ -889,26 +890,12 @@ class MapWidget(QWidget):
         toolbar_layout.addWidget(hazard_legend)
 
         # Dashed circle = district (with checkbox to toggle)
-        self.district_checkbox = QCheckBox("◯ Ranh giới quận")
+        self.district_checkbox = StyledCheckBox("◯ Ranh giới quận")
         self.district_checkbox.setChecked(True)
         self.district_checkbox.setStyleSheet(f"""
             QCheckBox {{
                 color: {COLORS.text_muted};
                 font-size: 10px;
-            }}
-            QCheckBox::indicator {{
-                width: 12px;
-                height: 12px;
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: {COLORS.primary};
-                border: 1px solid {COLORS.primary_dark};
-                border-radius: 2px;
-            }}
-            QCheckBox::indicator:unchecked {{
-                background-color: {COLORS.surface};
-                border: 1px solid {COLORS.border};
-                border-radius: 2px;
             }}
         """)
         self.district_checkbox.stateChanged.connect(self._on_district_toggle)

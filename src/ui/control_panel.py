@@ -355,11 +355,13 @@ class ControlPanel(QWidget):
         self.show_particles.setChecked(True)
         self.show_particles.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_particles)
+        sim_layout.addSpacing(4)
 
         self.show_routes = QCheckBox("Hiển thị tuyến đường")
         self.show_routes.setChecked(True)
         self.show_routes.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_routes)
+        sim_layout.addSpacing(4)
 
         self.show_hazards = QCheckBox("Hiển thị vùng nguy hiểm")
         self.show_hazards.setChecked(True)

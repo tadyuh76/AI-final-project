@@ -145,7 +145,7 @@ class SimulationWorker(QThread):
 
                 metrics = self.engine.step()
                 self.step_completed.emit(metrics.to_dict())
-                self.msleep(50)  # ~20 FPS update
+                self.msleep(10)  # Faster updates for quicker simulation
 
             if not self._should_stop:
                 self.simulation_completed.emit(self.engine.metrics)
@@ -382,10 +382,12 @@ class MainWindow(QMainWindow):
         if self._simulation_worker:
             if self._simulation_worker._is_paused:
                 self._simulation_worker.resume()
+                self.map_widget.canvas.start_animation()  # Resume animation
                 self.control_panel.set_paused_state(False)
                 self.status_label.setText("Tiep tuc mo phong...")
             else:
                 self._simulation_worker.pause()
+                self.map_widget.canvas.stop_animation()  # Stop animation when paused
                 self.control_panel.set_paused_state(True)
                 self.status_label.setText("Tam dung mo phong")
 
@@ -454,10 +456,6 @@ class MainWindow(QMainWindow):
     @pyqtSlot(dict)
     def _on_config_changed(self, config: Dict[str, Any]):
         """Xử lý khi cấu hình thay đổi."""
-        # Cập nhật typhoon category -> ảnh hưởng đến hazard zones
-        typhoon_category = config.get('typhoon_category', 3)
-        self._update_typhoon_intensity(typhoon_category)
-
         # Cập nhật population percentage
         population_percent = config.get('population_percent', 50)
         self._update_population_scale(population_percent)
@@ -469,32 +467,6 @@ class MainWindow(QMainWindow):
         simulation_speed = config.get('simulation_speed', 1.0)
         if self._simulation_engine:
             self._simulation_engine.config.speed_multiplier = simulation_speed
-
-    def _update_typhoon_intensity(self, category: int):
-        """Cập nhật cường độ bão và hazard zones.
-
-        Category 1-5 maps to intensity 0.3-1.0
-        """
-        if not self._network:
-            return
-
-        # Chuyển đổi category sang intensity
-        # Cat 1 = 0.3, Cat 2 = 0.475, Cat 3 = 0.65, Cat 4 = 0.825, Cat 5 = 1.0
-        intensity = 0.3 + (category - 1) * 0.175
-
-        # Cập nhật radius và risk level của hazard zones
-        hazard_zones = self._network.get_hazard_zones()
-        for i, hazard in enumerate(hazard_zones):
-            # Điều chỉnh radius dựa trên intensity (base * intensity_factor)
-            base_radius = hazard.base_radius_km if hasattr(hazard, 'base_radius_km') else hazard.radius_km
-            hazard.radius_km = base_radius * (0.5 + intensity * 0.5)  # 0.5x - 1.0x
-
-            # Điều chỉnh risk level
-            base_risk = hazard.base_risk_level if hasattr(hazard, 'base_risk_level') else hazard.risk_level
-            hazard.risk_level = min(1.0, base_risk * intensity)
-
-            # Cập nhật visualization
-            self.map_widget.canvas.update_hazard(i, hazard.radius_km, hazard.risk_level)
 
     def _update_population_scale(self, percent: float):
         """Cập nhật tỷ lệ dân số cần sơ tán."""
@@ -571,13 +543,13 @@ class MainWindow(QMainWindow):
         # Lấy thông số từ control panel
         params = self.control_panel.get_new_zone_params()
 
-        # Tạo vùng nguy hiểm mới
+        # Tạo vùng nguy hiểm mới (luôn là flood type)
         hazard = HazardZone(
             center_lat=lat,
             center_lon=lon,
             radius_km=params['radius_km'],
             risk_level=params['risk_level'],
-            hazard_type=params['hazard_type']
+            hazard_type='flood'
         )
 
         # Thêm vào network
@@ -760,7 +732,11 @@ class MainWindow(QMainWindow):
             total_arrivals = 0
             for shelter in self._network.get_active_shelters():
                 total_capacity += shelter.capacity
-                total_arrivals += shelter_arrivals.get(shelter.id, 0)
+                arrivals = shelter_arrivals.get(shelter.id, 0)
+                total_arrivals += arrivals
+                # Update shelter color on map based on occupancy
+                if shelter.id in self.map_widget.canvas._shelter_items:
+                    self.map_widget.canvas._shelter_items[shelter.id].update_occupancy(arrivals)
             metrics['remaining_shelter_capacity'] = max(0, total_capacity - total_arrivals)
 
         self.dashboard.update_metrics(metrics)

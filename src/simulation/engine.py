@@ -32,13 +32,13 @@ class SimulationState(Enum):
 @dataclass
 class SimulationConfig:
     """Cấu hình cho các tham số mô phỏng."""
-    time_step_minutes: float = 5.0  # Bước thời gian mô phỏng
+    time_step_minutes: float = 1.0  # Bước thời gian mô phỏng (giảm để chạy nhanh hơn)
     max_duration_hours: float = 24.0  # Thời lượng mô phỏng tối đa
     speed_multiplier: float = 1.0  # Hệ số nhân tốc độ thời gian thực
 
-    # Tham số dòng chảy
-    flow_rate_per_step: float = 0.1  # Phần trăm dân số còn lại mỗi bước
-    min_flow_per_route: int = 10  # Số người sơ tán tối thiểu mỗi tuyến đường mỗi bước
+    # Tham số dòng chảy - tăng để mô phỏng nhanh hơn
+    flow_rate_per_step: float = 0.5  # Phần trăm dân số còn lại mỗi bước (tăng từ 0.1)
+    min_flow_per_route: int = 100  # Số người sơ tán tối thiểu mỗi tuyến đường mỗi bước (tăng từ 10)
 
     # Tiến triển nguy hiểm
     hazard_expansion_rate: float = 0.01  # km mỗi bước thời gian

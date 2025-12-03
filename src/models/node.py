@@ -42,9 +42,13 @@ class PopulationZone(Node):
     population: int = 0
     evacuated: int = 0
     district_name: str = ""
+    # Dân số cơ sở để điều chỉnh theo tỷ lệ phần trăm
+    base_population: int = field(default=0, init=False)
 
     def __post_init__(self):
         self.node_type = NodeType.POPULATION_ZONE
+        if self.base_population == 0:
+            self.base_population = self.population
 
     @property
     def remaining_population(self) -> int:
@@ -102,6 +106,16 @@ class HazardZone:
     risk_level: float = 0.8  # 0.0 đến 1.0, càng cao = càng nguy hiểm
     hazard_type: str = "flood"  # lũ lụt, gió, mảnh vỡ, v.v.
     is_active: bool = True
+    # Giá trị cơ sở để điều chỉnh theo cường độ bão
+    base_radius_km: float = field(default=0.0, init=False)
+    base_risk_level: float = field(default=0.0, init=False)
+
+    def __post_init__(self):
+        """Lưu giá trị cơ sở sau khi khởi tạo."""
+        if self.base_radius_km == 0.0:
+            self.base_radius_km = self.radius_km
+        if self.base_risk_level == 0.0:
+            self.base_risk_level = self.risk_level
 
     @property
     def center(self) -> Tuple[float, float]:

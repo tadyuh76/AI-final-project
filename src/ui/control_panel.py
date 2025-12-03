@@ -59,6 +59,7 @@ class LabeledSlider(QWidget):
         super().__init__(parent)
         self.decimals = decimals
         self.scale = 10 ** decimals
+        self._block_signals = False  # Ngăn chặn vòng lặp signal
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -84,6 +85,8 @@ class LabeledSlider(QWidget):
         layout.addWidget(self.value_label)
 
     def _on_slider_changed(self, value: int):
+        if self._block_signals:
+            return
         real_value = value / self.scale
         self.value_label.setText(f"{real_value:.{self.decimals}f}")
         self.value_changed.emit(real_value)
@@ -91,8 +94,19 @@ class LabeledSlider(QWidget):
     def value(self) -> float:
         return self.slider.value() / self.scale
 
-    def setValue(self, value: float):
+    def setValue(self, value: float, block_signal: bool = False):
+        """Đặt giá trị slider.
+
+        Args:
+            value: Giá trị mới
+            block_signal: Nếu True, không phát signal value_changed
+        """
+        if block_signal:
+            self._block_signals = True
         self.slider.setValue(int(value * self.scale))
+        self.value_label.setText(f"{value:.{self.decimals}f}")
+        if block_signal:
+            self._block_signals = False
 
 
 class LabeledSpinBox(QWidget):
@@ -303,22 +317,28 @@ class ControlPanel(QWidget):
         params_group = QGroupBox("Tham số thuật toán")
         params_layout = QVBoxLayout(params_group)
 
-        # Trọng số GBFS
+        # Trọng số GBFS - tổng = 1.0
         self.weight_distance = LabeledSlider("Khoảng cách", 0, 1, 0.4)
-        self.weight_distance.value_changed.connect(self._on_config_changed)
+        self.weight_distance.value_changed.connect(lambda v: self._on_weight_changed('distance', v))
         params_layout.addWidget(self.weight_distance)
 
         self.weight_risk = LabeledSlider("Rủi ro", 0, 1, 0.3)
-        self.weight_risk.value_changed.connect(self._on_config_changed)
+        self.weight_risk.value_changed.connect(lambda v: self._on_weight_changed('risk', v))
         params_layout.addWidget(self.weight_risk)
 
         self.weight_congestion = LabeledSlider("Tắc nghẽn", 0, 1, 0.2)
-        self.weight_congestion.value_changed.connect(self._on_config_changed)
+        self.weight_congestion.value_changed.connect(lambda v: self._on_weight_changed('congestion', v))
         params_layout.addWidget(self.weight_congestion)
 
         self.weight_capacity = LabeledSlider("Sức chứa", 0, 1, 0.1)
-        self.weight_capacity.value_changed.connect(self._on_config_changed)
+        self.weight_capacity.value_changed.connect(lambda v: self._on_weight_changed('capacity', v))
         params_layout.addWidget(self.weight_capacity)
+
+        # Label hiển thị tổng trọng số
+        self.weight_total_label = QLabel("Tổng: 1.00")
+        self.weight_total_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.weight_total_label.setStyleSheet(f"color: {COLORS.success}; font-size: 11px;")
+        params_layout.addWidget(self.weight_total_label)
 
         # Tham số GWO
         params_layout.addWidget(QLabel(""))  # Spacer
@@ -423,6 +443,63 @@ class ControlPanel(QWidget):
         else:
             self.pause_button.setText("⏸ Tạm dừng")
             self.pause_clicked.emit()
+
+    def _on_weight_changed(self, changed_weight: str, new_value: float):
+        """Xử lý khi một trọng số thay đổi - tự động cân bằng các trọng số khác.
+
+        Khi một slider thay đổi, các slider còn lại được điều chỉnh
+        tỷ lệ để tổng = 1.0
+        """
+        # Mapping từ tên sang slider
+        weight_sliders = {
+            'distance': self.weight_distance,
+            'risk': self.weight_risk,
+            'congestion': self.weight_congestion,
+            'capacity': self.weight_capacity,
+        }
+
+        # Lấy các giá trị hiện tại của các slider KHÁC
+        other_weights = {}
+        for key, slider in weight_sliders.items():
+            if key != changed_weight:
+                other_weights[key] = slider.value()
+
+        other_sum = sum(other_weights.values())
+
+        # Giá trị còn lại cần phân bổ cho các slider khác
+        remaining = 1.0 - new_value
+
+        if remaining < 0:
+            # Nếu giá trị mới > 1.0, đặt về 1.0 và các slider khác = 0
+            remaining = 0.0
+
+        if other_sum > 0:
+            # Tỷ lệ để điều chỉnh các slider khác
+            scale = remaining / other_sum
+            for key, slider in weight_sliders.items():
+                if key != changed_weight:
+                    new_val = max(0.0, min(1.0, other_weights[key] * scale))
+                    slider.setValue(new_val, block_signal=True)
+        else:
+            # Nếu tất cả các slider khác = 0, phân bổ đều
+            if remaining > 0:
+                equal_share = remaining / 3
+                for key, slider in weight_sliders.items():
+                    if key != changed_weight:
+                        slider.setValue(equal_share, block_signal=True)
+
+        # Cập nhật label tổng
+        total = new_value + sum(s.value() for k, s in weight_sliders.items() if k != changed_weight)
+        self.weight_total_label.setText(f"Tổng: {total:.2f}")
+
+        # Màu sắc dựa trên tổng
+        if abs(total - 1.0) < 0.01:
+            self.weight_total_label.setStyleSheet(f"color: {COLORS.success}; font-size: 11px;")
+        else:
+            self.weight_total_label.setStyleSheet(f"color: {COLORS.warning}; font-size: 11px;")
+
+        # Phát signal config_changed
+        self.config_changed.emit(self.get_config())
 
     def _on_config_changed(self, *args):
         """Xử lý khi cấu hình thay đổi."""

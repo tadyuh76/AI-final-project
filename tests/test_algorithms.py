@@ -613,7 +613,7 @@ class TestAlgorithmComparator:
         result = comparator.compare([AlgorithmType.GBFS, AlgorithmType.GWO])
         table = comparator.generate_comparison_table(result)
 
-        assert 'ALGORITHM COMPARISON' in table
+        assert 'KẾT QUẢ SO SÁNH THUẬT TOÁN' in table
         assert 'GBFS' in table
         assert 'GWO' in table
 

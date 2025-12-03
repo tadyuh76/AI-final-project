@@ -48,6 +48,9 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         self.setZValue(10)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
 
+        # Cache item để tăng hiệu suất
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
+
         # Styling
         color = hex_to_qcolor(COLORS.cyan, 200)
         self.setBrush(QBrush(color))
@@ -135,6 +138,9 @@ class ShelterItem(QGraphicsRectItem):
         self.setPos(x, y)
         self.setZValue(15)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+
+        # Cache item để tăng hiệu suất
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
         self.setBrush(QBrush(hex_to_qcolor(COLORS.success, 220)))
         self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
@@ -323,6 +329,9 @@ class DistrictBorderItem(QGraphicsEllipseItem):
         self.setPos(x, y)
         self.setZValue(2)  # Phía trên đường, dưới hazard
 
+        # Cache item để không cần vẽ lại mỗi frame
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
+
         # Style: chỉ viền, không fill đặc
         self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
         self.setPen(QPen(color, 2, Qt.PenStyle.DashLine))
@@ -333,7 +342,8 @@ class DistrictBorderItem(QGraphicsEllipseItem):
             f"Diện tích: {district.area_km2:.1f} km²<br>"
             f"Rủi ro ngập: {district.flood_risk:.0%}"
         )
-        self.setAcceptHoverEvents(True)
+        # Tắt hover events để tăng hiệu suất
+        self.setAcceptHoverEvents(False)
 
         # Thêm nhãn tên quận
         self._label = QGraphicsTextItem(district.name_vi, self)
@@ -345,18 +355,6 @@ class DistrictBorderItem(QGraphicsEllipseItem):
         # Căn giữa nhãn
         label_rect = self._label.boundingRect()
         self._label.setPos(-label_rect.width() / 2, -radius_pixels - label_rect.height() - 5)
-
-    def hoverEnterEvent(self, event):
-        color = self.pen().color()
-        self.setPen(QPen(color, 3, Qt.PenStyle.SolidLine))
-        self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 60)))
-        super().hoverEnterEvent(event)
-
-    def hoverLeaveEvent(self, event):
-        color = self.pen().color()
-        self.setPen(QPen(color, 2, Qt.PenStyle.DashLine))
-        self.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
-        super().hoverLeaveEvent(event)
 
 
 class RouteItem(QGraphicsPathItem):
@@ -530,19 +528,21 @@ class MapCanvas(QGraphicsView):
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
 
-        # View settings
-        self.setRenderHints(
-            QPainter.RenderHint.Antialiasing |
-            QPainter.RenderHint.SmoothPixmapTransform
-        )
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
+        # View settings - tối ưu hóa cho hiệu suất
+        # Chỉ bật Antialiasing khi cần, tắt SmoothPixmapTransform
+        self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # Sử dụng MinimalViewportUpdate để giảm repaints
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
-        # Background with grid
+        # Tối ưu hóa scene indexing cho nhiều items
+        self._scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.NoIndex)
+
+        # Background - màu đơn giản, không grid động
         self.setBackgroundBrush(QBrush(hex_to_qcolor(COLORS.background)))
 
         # State
@@ -569,32 +569,40 @@ class MapCanvas(QGraphicsView):
         # Active evacuee groups for animation
         self._active_groups: List[Dict[str, Any]] = []
 
-    def drawBackground(self, painter: QPainter, rect: QRectF):
-        """Vẽ nền với lưới."""
-        # Fill background
-        painter.fillRect(rect, hex_to_qcolor(COLORS.background))
+    def _draw_static_grid(self):
+        """Vẽ grid tĩnh một lần vào scene thay vì vẽ lại mỗi frame."""
+        if not self._network:
+            return
 
-        # Draw grid
-        grid_size = 50  # pixels between grid lines
-        grid_color = hex_to_qcolor(COLORS.surface, 100)
-        grid_pen = QPen(grid_color, 1, Qt.PenStyle.DotLine)
-        painter.setPen(grid_pen)
+        bounds = self._scene.sceneRect()
+        grid_size = 100  # pixels between grid lines (lớn hơn để giảm số đường)
+        grid_color = hex_to_qcolor(COLORS.surface, 60)
+        grid_pen = QPen(grid_color, 0.5, Qt.PenStyle.DotLine)
 
-        # Calculate visible grid lines
-        left = int(rect.left() / grid_size) * grid_size
-        top = int(rect.top() / grid_size) * grid_size
+        # Batch tất cả grid lines vào một path duy nhất
+        grid_path = QPainterPath()
+
+        left = int(bounds.left() / grid_size) * grid_size
+        top = int(bounds.top() / grid_size) * grid_size
 
         # Vertical lines
         x = left
-        while x < rect.right():
-            painter.drawLine(int(x), int(rect.top()), int(x), int(rect.bottom()))
+        while x < bounds.right():
+            grid_path.moveTo(x, bounds.top())
+            grid_path.lineTo(x, bounds.bottom())
             x += grid_size
 
         # Horizontal lines
         y = top
-        while y < rect.bottom():
-            painter.drawLine(int(rect.left()), int(y), int(rect.right()), int(y))
+        while y < bounds.bottom():
+            grid_path.moveTo(bounds.left(), y)
+            grid_path.lineTo(bounds.right(), y)
             y += grid_size
+
+        grid_item = QGraphicsPathItem(grid_path)
+        grid_item.setPen(grid_pen)
+        grid_item.setZValue(-1)  # Phía sau tất cả
+        self._scene.addItem(grid_item)
 
     def set_network(self, network: EvacuationNetwork):
         """Thiết lập mạng lưới và vẽ lên canvas."""
@@ -604,6 +612,9 @@ class MapCanvas(QGraphicsView):
 
         # Set scene rect based on items
         self._scene.setSceneRect(self._scene.itemsBoundingRect().adjusted(-100, -100, 100, 100))
+
+        # Vẽ grid tĩnh sau khi có scene rect
+        self._draw_static_grid()
 
         # Fit to view
         self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
@@ -664,9 +675,14 @@ class MapCanvas(QGraphicsView):
             self._district_items[district_id] = item
 
     def _draw_edges(self):
-        """Vẽ các đường trong mạng lưới."""
+        """Vẽ các đường trong mạng lưới - batch theo risk level để giảm items."""
         if not self._network:
             return
+
+        # Batch edges theo risk level để tạo ít items hơn
+        high_risk_path = QPainterPath()
+        med_risk_path = QPainterPath()
+        low_risk_path = QPainterPath()
 
         for edge in self._network.get_edges():
             source = self._network.get_node(edge.source_id)
@@ -678,24 +694,33 @@ class MapCanvas(QGraphicsView):
             p1 = self._lat_lon_to_pixel(source.lat, source.lon)
             p2 = self._lat_lon_to_pixel(target.lat, target.lon)
 
-            path = QPainterPath()
-            path.moveTo(p1)
-            path.lineTo(p2)
-
-            item = QGraphicsPathItem(path)
-
-            # Color based on flood risk
+            # Batch vào path tương ứng theo risk level
             if edge.flood_risk > 0.7:
-                color = hex_to_qcolor(COLORS.danger, 120)
-                width = 2
+                high_risk_path.moveTo(p1)
+                high_risk_path.lineTo(p2)
             elif edge.flood_risk > 0.3:
-                color = hex_to_qcolor(COLORS.warning, 100)
-                width = 1.5
+                med_risk_path.moveTo(p1)
+                med_risk_path.lineTo(p2)
             else:
-                color = hex_to_qcolor(COLORS.surface_hover, 80)
-                width = 1
+                low_risk_path.moveTo(p1)
+                low_risk_path.lineTo(p2)
 
-            item.setPen(QPen(color, width))
+        # Tạo 3 items thay vì hàng ngàn
+        if not low_risk_path.isEmpty():
+            item = QGraphicsPathItem(low_risk_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 80), 1))
+            item.setZValue(1)
+            self._scene.addItem(item)
+
+        if not med_risk_path.isEmpty():
+            item = QGraphicsPathItem(med_risk_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.warning, 100), 1.5))
+            item.setZValue(1)
+            self._scene.addItem(item)
+
+        if not high_risk_path.isEmpty():
+            item = QGraphicsPathItem(high_risk_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.danger, 120), 2))
             item.setZValue(1)
             self._scene.addItem(item)
 

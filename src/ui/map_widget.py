@@ -585,12 +585,16 @@ class MapCanvas(QGraphicsView):
 
     node_clicked = pyqtSignal(str, str)
     zoom_changed = pyqtSignal(float)
+    map_clicked_for_hazard = pyqtSignal(float, float)  # lat, lon when in hazard add mode
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
+
+        # Hazard zone interaction state
+        self._hazard_add_mode: bool = False
 
         # View settings - tối ưu hóa cho hiệu suất
         # Chỉ bật Antialiasing khi cần, tắt SmoothPixmapTransform
@@ -716,6 +720,12 @@ class MapCanvas(QGraphicsView):
         x = lon * self._scale_factor
         y = -lat * self._scale_factor  # Flip Y axis
         return QPointF(x, y)
+
+    def _pixel_to_lat_lon(self, x: float, y: float) -> Tuple[float, float]:
+        """Chuyển đổi tọa độ pixel sang lat/lon."""
+        lon = x / self._scale_factor
+        lat = -y / self._scale_factor  # Flip Y axis
+        return (lat, lon)
 
     def _draw_network(self):
         """Vẽ toàn bộ mạng lưới lên canvas."""
@@ -1080,6 +1090,37 @@ class MapCanvas(QGraphicsView):
             self.zoom_in()
         elif delta < 0:
             self.zoom_out()
+
+    def mousePressEvent(self, event):
+        """Xử lý click chuột - hỗ trợ chế độ đặt vùng nguy hiểm."""
+        if self._hazard_add_mode and event.button() == Qt.MouseButton.LeftButton:
+            # Chuyển đổi vị trí click sang tọa độ scene
+            scene_pos = self.mapToScene(event.pos())
+            lat, lon = self._pixel_to_lat_lon(scene_pos.x(), scene_pos.y())
+            self.map_clicked_for_hazard.emit(lat, lon)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def set_hazard_add_mode(self, enabled: bool):
+        """Bật/tắt chế độ đặt vùng nguy hiểm."""
+        self._hazard_add_mode = enabled
+        if enabled:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+
+    def refresh_hazard_zones(self):
+        """Làm mới hiển thị các vùng nguy hiểm từ network."""
+        # Xóa các hazard items cũ
+        for item in self._hazard_items.values():
+            self._scene.removeItem(item)
+        self._hazard_items.clear()
+
+        # Vẽ lại từ network
+        self._draw_hazards()
 
     def set_districts_visible(self, visible: bool):
         """Ẩn/hiện ranh giới các quận."""

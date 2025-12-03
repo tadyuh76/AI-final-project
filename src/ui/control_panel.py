@@ -2,7 +2,7 @@
 Panel điều khiển cho cấu hình thuật toán và điều khiển mô phỏng.
 """
 
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QPushButton, QComboBox, QSlider, QSpinBox, QDoubleSpinBox,
@@ -246,6 +246,12 @@ class ControlPanel(QWidget):
     algorithm_changed = pyqtSignal(str)
     config_changed = pyqtSignal(dict)
 
+    # Hazard zone signals
+    hazard_add_mode_changed = pyqtSignal(bool)
+    hazard_zone_delete_requested = pyqtSignal(int)
+    hazard_zones_clear_requested = pyqtSignal()
+    hazard_zones_randomize_requested = pyqtSignal(dict)
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setMinimumWidth(Sizes.SIDEBAR_WIDTH)
@@ -424,6 +430,10 @@ class ControlPanel(QWidget):
 
         layout.addWidget(sim_group)
 
+        # ===== Cấu hình vùng nguy hiểm =====
+        hazard_group = self._setup_hazard_config_section()
+        layout.addWidget(hazard_group)
+
         # Spacer
         layout.addStretch()
 
@@ -432,6 +442,170 @@ class ControlPanel(QWidget):
         self.status_label.setProperty("muted", True)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
+
+    def _setup_hazard_config_section(self) -> QGroupBox:
+        """Tạo section cấu hình vùng nguy hiểm."""
+        hazard_group = QGroupBox("Cấu hình vùng nguy hiểm")
+        hazard_layout = QVBoxLayout(hazard_group)
+
+        # === Add mode toggle button ===
+        self.hazard_add_mode_btn = QPushButton("🎯 Đặt vùng nguy hiểm")
+        self.hazard_add_mode_btn.setCheckable(True)
+        self.hazard_add_mode_btn.setToolTip("Bật chế độ này rồi nhấn vào bản đồ để đặt vùng nguy hiểm")
+        self.hazard_add_mode_btn.toggled.connect(self._on_hazard_add_mode_toggled)
+        hazard_layout.addWidget(self.hazard_add_mode_btn)
+
+        hazard_layout.addSpacing(8)
+
+        # === New zone parameters ===
+        params_label = QLabel("Thông số vùng mới:")
+        params_label.setProperty("subheading", True)
+        hazard_layout.addWidget(params_label)
+
+        self.hazard_severity_slider = LabeledSlider("Mức độ (%)", 0, 100, 70, decimals=0)
+        hazard_layout.addWidget(self.hazard_severity_slider)
+
+        self.hazard_radius_slider = LabeledSlider("Bán kính (km)", 0.5, 5.0, 1.5, decimals=1)
+        hazard_layout.addWidget(self.hazard_radius_slider)
+
+        # Hazard type combo
+        type_layout = QHBoxLayout()
+        type_label = QLabel("Loại")
+        type_label.setMinimumWidth(80)
+        type_layout.addWidget(type_label)
+
+        self.hazard_type_combo = QComboBox()
+        self.hazard_type_combo.addItems(["flood", "wind", "debris"])
+        type_layout.addWidget(self.hazard_type_combo, 1)
+        hazard_layout.addLayout(type_layout)
+
+        hazard_layout.addSpacing(8)
+
+        # === Zone management ===
+        self.hazard_zone_count_label = QLabel("Vùng hiện có: 0")
+        hazard_layout.addWidget(self.hazard_zone_count_label)
+
+        # Zone selector
+        selector_layout = QHBoxLayout()
+        selector_label = QLabel("Chọn vùng")
+        selector_label.setMinimumWidth(80)
+        selector_layout.addWidget(selector_label)
+
+        self.hazard_zone_selector = QComboBox()
+        self.hazard_zone_selector.setPlaceholderText("Không có vùng nào")
+        self.hazard_zone_selector.currentIndexChanged.connect(self._on_hazard_zone_selected)
+        selector_layout.addWidget(self.hazard_zone_selector, 1)
+        hazard_layout.addLayout(selector_layout)
+
+        # Delete buttons
+        delete_btn_layout = QHBoxLayout()
+
+        self.hazard_delete_btn = QPushButton("Xóa vùng")
+        self.hazard_delete_btn.setEnabled(False)
+        self.hazard_delete_btn.clicked.connect(self._on_hazard_delete_clicked)
+        delete_btn_layout.addWidget(self.hazard_delete_btn)
+
+        self.hazard_clear_all_btn = QPushButton("Xóa tất cả")
+        self.hazard_clear_all_btn.clicked.connect(self._on_hazard_clear_all_clicked)
+        delete_btn_layout.addWidget(self.hazard_clear_all_btn)
+
+        hazard_layout.addLayout(delete_btn_layout)
+
+        hazard_layout.addSpacing(8)
+
+        # === Randomization section ===
+        random_label = QLabel("Tạo ngẫu nhiên:")
+        random_label.setProperty("subheading", True)
+        hazard_layout.addWidget(random_label)
+
+        self.hazard_random_count = LabeledSpinBox("Số vùng", 1, 20, 5)
+        hazard_layout.addWidget(self.hazard_random_count)
+
+        self.hazard_random_min_radius = LabeledSlider("Bán kính min", 0.5, 3.0, 0.5, decimals=1)
+        hazard_layout.addWidget(self.hazard_random_min_radius)
+
+        self.hazard_random_max_radius = LabeledSlider("Bán kính max", 1.0, 5.0, 3.0, decimals=1)
+        hazard_layout.addWidget(self.hazard_random_max_radius)
+
+        self.hazard_random_min_severity = LabeledSlider("Mức độ min (%)", 0, 100, 30, decimals=0)
+        hazard_layout.addWidget(self.hazard_random_min_severity)
+
+        self.hazard_random_max_severity = LabeledSlider("Mức độ max (%)", 0, 100, 90, decimals=0)
+        hazard_layout.addWidget(self.hazard_random_max_severity)
+
+        self.hazard_randomize_btn = QPushButton("🎲 Tạo ngẫu nhiên")
+        self.hazard_randomize_btn.clicked.connect(self._on_hazard_randomize_clicked)
+        hazard_layout.addWidget(self.hazard_randomize_btn)
+
+        return hazard_group
+
+    def _on_hazard_add_mode_toggled(self, checked: bool):
+        """Xử lý khi bật/tắt chế độ đặt vùng nguy hiểm."""
+        if checked:
+            self.hazard_add_mode_btn.setText("🎯 Đang đặt vùng... (nhấn để tắt)")
+            self.hazard_add_mode_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS.warning};
+                    color: black;
+                    font-weight: bold;
+                }}
+            """)
+        else:
+            self.hazard_add_mode_btn.setText("🎯 Đặt vùng nguy hiểm")
+            self.hazard_add_mode_btn.setStyleSheet("")
+        self.hazard_add_mode_changed.emit(checked)
+
+    def _on_hazard_zone_selected(self, index: int):
+        """Xử lý khi chọn vùng nguy hiểm từ dropdown."""
+        self.hazard_delete_btn.setEnabled(index >= 0)
+
+    def _on_hazard_delete_clicked(self):
+        """Xử lý khi nhấn nút xóa vùng."""
+        index = self.hazard_zone_selector.currentIndex()
+        if index >= 0:
+            self.hazard_zone_delete_requested.emit(index)
+
+    def _on_hazard_clear_all_clicked(self):
+        """Xử lý khi nhấn nút xóa tất cả."""
+        self.hazard_zones_clear_requested.emit()
+
+    def _on_hazard_randomize_clicked(self):
+        """Xử lý khi nhấn nút tạo ngẫu nhiên."""
+        params = self.get_randomization_params()
+        self.hazard_zones_randomize_requested.emit(params)
+
+    def get_new_zone_params(self) -> Dict[str, Any]:
+        """Lấy thông số cho vùng nguy hiểm mới."""
+        return {
+            'radius_km': self.hazard_radius_slider.value(),
+            'risk_level': self.hazard_severity_slider.value() / 100.0,
+            'hazard_type': self.hazard_type_combo.currentText()
+        }
+
+    def get_randomization_params(self) -> Dict[str, Any]:
+        """Lấy thông số cho việc tạo vùng ngẫu nhiên."""
+        return {
+            'count': self.hazard_random_count.value(),
+            'min_radius': self.hazard_random_min_radius.value(),
+            'max_radius': self.hazard_random_max_radius.value(),
+            'min_severity': self.hazard_random_min_severity.value() / 100.0,
+            'max_severity': self.hazard_random_max_severity.value() / 100.0
+        }
+
+    def update_hazard_zone_list(self, zones: List):
+        """Cập nhật danh sách vùng nguy hiểm trong dropdown."""
+        self.hazard_zone_selector.clear()
+        self.hazard_zone_count_label.setText(f"Vùng hiện có: {len(zones)}")
+
+        for i, zone in enumerate(zones):
+            label = f"Vùng {i+1} ({zone.radius_km:.1f}km, {zone.risk_level*100:.0f}%)"
+            self.hazard_zone_selector.addItem(label)
+
+        self.hazard_delete_btn.setEnabled(len(zones) > 0)
+
+    def set_hazard_add_mode(self, enabled: bool):
+        """Đặt trạng thái chế độ đặt vùng nguy hiểm."""
+        self.hazard_add_mode_btn.setChecked(enabled)
 
     def _on_algorithm_changed(self, text: str):
         """Xử lý khi thuật toán thay đổi."""

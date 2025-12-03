@@ -28,7 +28,9 @@ from ..algorithms.gwo import GreyWolfOptimizer
 from ..algorithms.hybrid import HybridGBFSGWO
 from ..algorithms.comparator import AlgorithmComparator, ComparisonResult
 from ..simulation.engine import SimulationEngine, SimulationConfig, SimulationMetrics
-from ..data.hcm_data import HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS
+import random
+from ..data.hcm_data import HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS
+from ..models.node import HazardZone
 from ..data.osm_loader import OSMDataLoader, load_network
 
 
@@ -288,6 +290,15 @@ class MainWindow(QMainWindow):
         self.control_panel.algorithm_changed.connect(self._on_algorithm_changed)
         self.control_panel.config_changed.connect(self._on_config_changed)
 
+        # Hazard zone configuration signals
+        self.control_panel.hazard_add_mode_changed.connect(self._on_hazard_add_mode_changed)
+        self.control_panel.hazard_zone_delete_requested.connect(self._on_hazard_zone_delete)
+        self.control_panel.hazard_zones_clear_requested.connect(self._on_hazard_zones_clear)
+        self.control_panel.hazard_zones_randomize_requested.connect(self._on_hazard_zones_randomize)
+
+        # Map click signal for hazard placement
+        self.map_widget.canvas.map_clicked_for_hazard.connect(self._on_map_clicked_for_hazard)
+
     def _load_network(self):
         """Tải mạng lưới từ dữ liệu."""
         self.status_label.setText("Dang tai mang luoi...")
@@ -312,6 +323,9 @@ class MainWindow(QMainWindow):
             total_shelters = stats.shelters
             total_capacity = stats.total_shelter_capacity
             self.dashboard.update_shelter_status(active_shelters, total_shelters, total_capacity)
+
+            # Initialize hazard zone list in control panel
+            self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
 
         except Exception as e:
             QMessageBox.warning(self, "Loi", f"Khong the tai mang luoi: {e}")
@@ -536,6 +550,101 @@ class MainWindow(QMainWindow):
                 self.status_label.setText(f"Đã vẽ tất cả đường ({len(self.map_widget.canvas._edge_items)} layers)")
             else:
                 self.status_label.setText("Chỉ hiển thị đường chính")
+
+    # ===== Hazard Zone Configuration Handlers =====
+
+    @pyqtSlot(bool)
+    def _on_hazard_add_mode_changed(self, enabled: bool):
+        """Xử lý khi bật/tắt chế độ đặt vùng nguy hiểm."""
+        self.map_widget.canvas.set_hazard_add_mode(enabled)
+        if enabled:
+            self.status_label.setText("Nhấn vào bản đồ để đặt vùng nguy hiểm")
+        else:
+            self.status_label.setText("Đã tắt chế độ đặt vùng nguy hiểm")
+
+    @pyqtSlot(float, float)
+    def _on_map_clicked_for_hazard(self, lat: float, lon: float):
+        """Xử lý khi click vào bản đồ để đặt vùng nguy hiểm."""
+        if not self._network:
+            return
+
+        # Lấy thông số từ control panel
+        params = self.control_panel.get_new_zone_params()
+
+        # Tạo vùng nguy hiểm mới
+        hazard = HazardZone(
+            center_lat=lat,
+            center_lon=lon,
+            radius_km=params['radius_km'],
+            risk_level=params['risk_level'],
+            hazard_type=params['hazard_type']
+        )
+
+        # Thêm vào network
+        self._network.add_hazard_zone(hazard)
+
+        # Cập nhật visualization
+        self.map_widget.canvas.refresh_hazard_zones()
+
+        # Cập nhật danh sách trong control panel
+        self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
+
+        self.status_label.setText(f"Đã thêm vùng nguy hiểm tại ({lat:.4f}, {lon:.4f})")
+
+    @pyqtSlot(int)
+    def _on_hazard_zone_delete(self, index: int):
+        """Xử lý khi xóa một vùng nguy hiểm."""
+        if not self._network:
+            return
+
+        zones = self._network.get_hazard_zones()
+        if 0 <= index < len(zones):
+            self._network.remove_hazard_zone(index)
+            self.map_widget.canvas.refresh_hazard_zones()
+            self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
+            self.status_label.setText("Đã xóa vùng nguy hiểm")
+
+    @pyqtSlot()
+    def _on_hazard_zones_clear(self):
+        """Xử lý khi xóa tất cả vùng nguy hiểm."""
+        if not self._network:
+            return
+
+        self._network.clear_hazard_zones()
+        self.map_widget.canvas.refresh_hazard_zones()
+        self.control_panel.update_hazard_zone_list([])
+        self.status_label.setText("Đã xóa tất cả vùng nguy hiểm")
+
+    @pyqtSlot(dict)
+    def _on_hazard_zones_randomize(self, params: dict):
+        """Xử lý khi tạo ngẫu nhiên các vùng nguy hiểm."""
+        if not self._network:
+            return
+
+        # Xóa các vùng hiện có
+        self._network.clear_hazard_zones()
+
+        # Tạo các vùng ngẫu nhiên
+        count = params['count']
+        for _ in range(count):
+            lat = random.uniform(HCM_BOUNDS['south'], HCM_BOUNDS['north'])
+            lon = random.uniform(HCM_BOUNDS['west'], HCM_BOUNDS['east'])
+            radius = random.uniform(params['min_radius'], params['max_radius'])
+            severity = random.uniform(params['min_severity'], params['max_severity'])
+
+            hazard = HazardZone(
+                center_lat=lat,
+                center_lon=lon,
+                radius_km=radius,
+                risk_level=severity,
+                hazard_type='flood'
+            )
+            self._network.add_hazard_zone(hazard)
+
+        # Cập nhật visualization
+        self.map_widget.canvas.refresh_hazard_zones()
+        self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
+        self.status_label.setText(f"Đã tạo {count} vùng nguy hiểm ngẫu nhiên")
 
     @pyqtSlot(str, int, float)
     def _on_optimization_progress(self, algo: str, iteration: int, cost: float):

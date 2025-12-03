@@ -26,6 +26,7 @@ from .styles import COLORS, hex_to_rgb, Animation, MapStyle, Sizes
 from .control_panel import StyledCheckBox
 from ..models.network import EvacuationNetwork
 from ..models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from ..models.edge import RoadType
 from ..data.hcm_data import HCM_DISTRICTS, DistrictData
 
 
@@ -675,16 +676,41 @@ class MapCanvas(QGraphicsView):
             self._district_items[district_id] = item
 
     def _draw_edges(self):
-        """Vẽ các đường trong mạng lưới - batch theo risk level để giảm items."""
+        """Vẽ các đường trong mạng lưới - chỉ vẽ đường chính để tối ưu hiệu suất.
+
+        Với 195k+ edges, vẽ tất cả sẽ rất chậm. Chỉ vẽ:
+        - Đường cao tốc (motorway)
+        - Đường trục (trunk)
+        - Đường cấp một (primary)
+        - Đường cấp hai (secondary)
+        - Đường cấp ba (tertiary)
+
+        Bỏ qua đường dân cư và đường không phân loại.
+        """
         if not self._network:
             return
 
-        # Batch edges theo risk level để tạo ít items hơn
-        high_risk_path = QPainterPath()
-        med_risk_path = QPainterPath()
-        low_risk_path = QPainterPath()
+        # Các loại đường chính cần vẽ
+        MAJOR_ROAD_TYPES = {
+            RoadType.MOTORWAY,
+            RoadType.TRUNK,
+            RoadType.PRIMARY,
+            RoadType.SECONDARY,
+            RoadType.TERTIARY,
+        }
 
+        # Batch edges theo loại đường để phân biệt style
+        motorway_path = QPainterPath()
+        primary_path = QPainterPath()
+        secondary_path = QPainterPath()
+        tertiary_path = QPainterPath()
+
+        edges_drawn = 0
         for edge in self._network.get_edges():
+            # Bỏ qua đường dân cư và đường không phân loại
+            if edge.road_type not in MAJOR_ROAD_TYPES:
+                continue
+
             source = self._network.get_node(edge.source_id)
             target = self._network.get_node(edge.target_id)
 
@@ -694,34 +720,45 @@ class MapCanvas(QGraphicsView):
             p1 = self._lat_lon_to_pixel(source.lat, source.lon)
             p2 = self._lat_lon_to_pixel(target.lat, target.lon)
 
-            # Batch vào path tương ứng theo risk level
-            if edge.flood_risk > 0.7:
-                high_risk_path.moveTo(p1)
-                high_risk_path.lineTo(p2)
-            elif edge.flood_risk > 0.3:
-                med_risk_path.moveTo(p1)
-                med_risk_path.lineTo(p2)
-            else:
-                low_risk_path.moveTo(p1)
-                low_risk_path.lineTo(p2)
+            # Batch vào path tương ứng theo loại đường
+            if edge.road_type in (RoadType.MOTORWAY, RoadType.TRUNK):
+                motorway_path.moveTo(p1)
+                motorway_path.lineTo(p2)
+            elif edge.road_type == RoadType.PRIMARY:
+                primary_path.moveTo(p1)
+                primary_path.lineTo(p2)
+            elif edge.road_type == RoadType.SECONDARY:
+                secondary_path.moveTo(p1)
+                secondary_path.lineTo(p2)
+            else:  # TERTIARY
+                tertiary_path.moveTo(p1)
+                tertiary_path.lineTo(p2)
 
-        # Tạo 3 items thay vì hàng ngàn
-        if not low_risk_path.isEmpty():
-            item = QGraphicsPathItem(low_risk_path)
+            edges_drawn += 1
+
+        # Vẽ từ dưới lên (đường nhỏ trước, đường lớn sau)
+        if not tertiary_path.isEmpty():
+            item = QGraphicsPathItem(tertiary_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 60), 0.5))
+            item.setZValue(1)
+            self._scene.addItem(item)
+
+        if not secondary_path.isEmpty():
+            item = QGraphicsPathItem(secondary_path)
             item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 80), 1))
-            item.setZValue(1)
+            item.setZValue(1.1)
             self._scene.addItem(item)
 
-        if not med_risk_path.isEmpty():
-            item = QGraphicsPathItem(med_risk_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.warning, 100), 1.5))
-            item.setZValue(1)
+        if not primary_path.isEmpty():
+            item = QGraphicsPathItem(primary_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.primary, 100), 1.5))
+            item.setZValue(1.2)
             self._scene.addItem(item)
 
-        if not high_risk_path.isEmpty():
-            item = QGraphicsPathItem(high_risk_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.danger, 120), 2))
-            item.setZValue(1)
+        if not motorway_path.isEmpty():
+            item = QGraphicsPathItem(motorway_path)
+            item.setPen(QPen(hex_to_qcolor(COLORS.warning, 120), 2))
+            item.setZValue(1.3)
             self._scene.addItem(item)
 
     def _draw_hazards(self):

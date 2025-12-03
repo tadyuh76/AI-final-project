@@ -568,11 +568,12 @@ class MainWindow(QMainWindow):
     @pyqtSlot(object)
     def _on_comparison_completed(self, result: ComparisonResult):
         """Xử lý khi so sánh hoàn thành."""
-        # Prepare data for comparison view
+        # Chuẩn bị dữ liệu cho comparison view
         comparison_data = {
             'metrics': {},
             'convergence': {},
             'radar_data': {},
+            'plans': {},
             'winner': result.winner.value if result.winner else '',
             'winner_score': result.winner_score
         }
@@ -581,18 +582,26 @@ class MainWindow(QMainWindow):
             comparison_data['metrics'][algo.value] = metrics.to_dict()
             comparison_data['convergence'][algo.value] = metrics.convergence_history
 
-            # Calculate radar data (normalized 0-1)
-            # [Speed, Safety, Coverage, Balance, Efficiency]
+            # Tính toán dữ liệu radar (chuẩn hóa 0-1)
+            # [Tốc độ, An toàn, Bao phủ, Cân bằng, Hiệu quả]
             max_time = max(m.execution_time_seconds for m in result.metrics.values()) or 1
             max_cost = max(m.final_cost for m in result.metrics.values()) or 1
 
             comparison_data['radar_data'][algo.value] = [
-                1 - (metrics.execution_time_seconds / max_time),  # Speed
-                1 - (metrics.final_cost / max_cost),  # Safety/Quality
-                metrics.coverage_rate,  # Coverage
-                0.8,  # Balance (placeholder)
-                1 - (metrics.average_path_length / 20 if metrics.average_path_length else 0.5)  # Efficiency
+                1 - (metrics.execution_time_seconds / max_time),  # Tốc độ
+                1 - (metrics.final_cost / max_cost),  # An toàn/Chất lượng
+                metrics.coverage_rate,  # Bao phủ
+                0.8,  # Cân bằng (placeholder)
+                1 - (metrics.average_path_length / 20 if metrics.average_path_length else 0.5)  # Hiệu quả
             ]
+
+        # Thêm plans vào dữ liệu so sánh để hiển thị trên bản đồ
+        for algo, plan in result.plans.items():
+            comparison_data['plans'][algo.value] = plan
+
+        # Thiết lập network cho comparison view
+        if self._network:
+            self.comparison_view.set_network(self._network)
 
         self.comparison_view.update_comparison(comparison_data)
 

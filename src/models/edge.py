@@ -120,8 +120,8 @@ class Edge:
         if self.is_blocked:
             return float('inf')
 
-        # Block high-risk edges completely
-        if self.flood_risk > 0.7:
+        # Block high-risk edges completely (standardized 0.6 threshold)
+        if self.flood_risk > 0.6:
             return float('inf')
 
         time_cost = self.current_travel_time

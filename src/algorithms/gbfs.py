@@ -132,7 +132,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 continue
             # Check if shelter is in high-risk hazard zone
             shelter_risk = self.network.get_total_risk_at(s.lat, s.lon)
-            if shelter_risk > 0.5:  # Skip shelters in high-risk zones (consistent threshold)
+            if shelter_risk > 0.6:  # Standardized risk threshold (0.6)
                 continue
             available_shelters.append(s)
 
@@ -255,47 +255,65 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         paths_found = 0
         total_path_length = 0
 
-        # Sắp xếp các khu vực theo dân số (ưu tiên các khu vực lớn hơn)
-        zones = sorted(zones, key=lambda z: z.population, reverse=True)
+        # Filter zones: only evacuate zones that are in hazard areas
+        # Zones far from hazards (low risk) don't need evacuation
+        zones_to_evacuate = []
+        zones_skipped = []
+        for z in zones:
+            zone_risk = self.network.get_total_risk_at(z.lat, z.lon)
+            if zone_risk >= self.config.min_zone_risk_for_evacuation:
+                zones_to_evacuate.append((z, zone_risk))
+            else:
+                zones_skipped.append(z)
+
+        # Sort by risk (highest first) then by population
+        zones_to_evacuate.sort(key=lambda x: (-x[1], -x[0].population))
+        zones = [z for z, _ in zones_to_evacuate]
+
+        # Track remaining population per zone for multi-route support
+        zone_remaining = {z.id: z.population for z in zones}
 
         for i, zone in enumerate(zones):
             if self._should_stop:
                 break
 
-            # Tìm đường đi cho khu vực này
-            path, shelter, cost = self.find_path(zone, shelters)
+            # Continue assigning until zone is fully evacuated or no more shelter capacity
+            while zone_remaining[zone.id] >= self.config.min_flow_threshold:
+                # Tìm đường đi cho khu vực này
+                path, shelter, cost = self.find_path(zone, shelters)
 
-            if path and shelter:
+                if not path or not shelter:
+                    break
+
                 # Tính toán các chỉ số tuyến đường
                 route_distance = self._calculate_path_distance(path)
                 route_time = self._calculate_path_time(path)
                 route_risk = self._calculate_path_risk(path)
 
-                # Xác định luồng (toàn bộ dân số còn lại từ khu vực)
-                flow = zone.remaining_population
+                # Use remaining population, capped by shelter capacity
+                actual_flow = min(zone_remaining[zone.id], shelter.available_capacity)
 
-                # Kiểm tra sức chứa của nơi trú ẩn
-                actual_flow = min(flow, shelter.available_capacity)
+                if actual_flow < self.config.min_flow_threshold:
+                    break
 
-                if actual_flow > 0:
-                    route = EvacuationRoute(
-                        zone_id=zone.id,
-                        shelter_id=shelter.id,
-                        path=path,
-                        flow=actual_flow,
-                        distance_km=route_distance,
-                        estimated_time_hours=route_time,
-                        risk_score=route_risk
-                    )
-                    plan.add_route(route)
+                route = EvacuationRoute(
+                    zone_id=zone.id,
+                    shelter_id=shelter.id,
+                    path=path,
+                    flow=actual_flow,
+                    distance_km=route_distance,
+                    estimated_time_hours=route_time,
+                    risk_score=route_risk
+                )
+                plan.add_route(route)
 
-                    # Cập nhật mức độ sử dụng nơi trú ẩn (để định tuyến nhận biết sức chứa)
-                    shelter.current_occupancy += actual_flow
-                    zone.evacuated += actual_flow
+                # Cập nhật mức độ sử dụng nơi trú ẩn (để định tuyến nhận biết sức chứa)
+                shelter.current_occupancy += actual_flow
+                zone_remaining[zone.id] -= actual_flow
 
-                    total_cost += cost
-                    paths_found += 1
-                    total_path_length += len(path)
+                total_cost += cost
+                paths_found += 1
+                total_path_length += len(path)
 
             # Báo cáo tiến trình
             self._metrics.convergence_history.append(total_cost)
@@ -303,7 +321,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
         # Hoàn thiện các chỉ số
         self._stop_timer(start_time)
-        self._metrics.iterations = total_zones
+        self._metrics.iterations = len(zones)  # Only count zones that needed evacuation
         self._metrics.final_cost = total_cost
         self._metrics.routes_found = paths_found
         self._metrics.evacuees_covered = plan.total_evacuees
@@ -311,10 +329,11 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             total_path_length / paths_found if paths_found > 0 else 0
         )
 
-        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
-        total_population = sum(z.population for z in zones)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(dân số cần sơ tán, tổng sức chứa)
+        # Only count population from zones that needed evacuation (in hazard areas)
+        population_needing_evacuation = sum(z.population for z in zones)
         total_capacity = sum(s.capacity for s in shelters)
-        max_possible = min(total_population, total_capacity)
+        max_possible = min(population_needing_evacuation, total_capacity)
         self._metrics.coverage_rate = (
             plan.total_evacuees / max_possible if max_possible > 0 else 0
         )

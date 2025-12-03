@@ -174,11 +174,11 @@ class BaseAlgorithm(ABC):
 @dataclass
 class AlgorithmConfig:
     """Cấu hình cho các tham số thuật toán."""
-    # Trọng số GBFS
-    distance_weight: float = 0.4
-    risk_weight: float = 0.3
-    congestion_weight: float = 0.2
-    capacity_weight: float = 0.1
+    # Trọng số GBFS (rebalanced for better shelter distribution)
+    distance_weight: float = 0.35
+    risk_weight: float = 0.25
+    congestion_weight: float = 0.15
+    capacity_weight: float = 0.25  # Increased from 0.1 to prioritize shelter capacity
 
     # Tham số GWO
     n_wolves: int = 30
@@ -190,7 +190,8 @@ class AlgorithmConfig:
     refinement_iterations: int = 20
 
     # Chung
-    min_flow_threshold: int = 100  # Lưu lượng tối thiểu để tạo tuyến đường
+    min_flow_threshold: int = 20  # Lowered from 100 to avoid dropping small valid assignments
+    min_zone_risk_for_evacuation: float = 0.1  # Zones with risk below this don't need evacuation
 
     def to_dict(self) -> Dict[str, Any]:
         """Chuyển đổi sang từ điển."""
@@ -204,7 +205,8 @@ class AlgorithmConfig:
             'a_initial': self.a_initial,
             'gwo_iterations': self.gwo_iterations,
             'refinement_iterations': self.refinement_iterations,
-            'min_flow_threshold': self.min_flow_threshold
+            'min_flow_threshold': self.min_flow_threshold,
+            'min_zone_risk_for_evacuation': self.min_zone_risk_for_evacuation
         }
 
     @classmethod

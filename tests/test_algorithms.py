@@ -83,6 +83,16 @@ def create_simple_network():
             is_oneway=False
         ))
 
+    # Add a small hazard near the zones so they need evacuation (risk >= 0.1)
+    # This ensures zones are not filtered out by the min_zone_risk_for_evacuation threshold
+    hazard = HazardZone(
+        center_lat=10.025,  # Between zone1 and zone2
+        center_lon=106.0,
+        radius_km=5.0,      # Large enough to cover both zones
+        risk_level=0.3      # Low risk, just enough to trigger evacuation
+    )
+    network.add_hazard_zone(hazard)
+
     return network
 
 
@@ -110,8 +120,11 @@ class TestAlgorithmConfig:
     def test_default_values(self):
         """Kiểm tra các giá trị cấu hình mặc định."""
         config = AlgorithmConfig()
-        assert config.distance_weight == 0.4
-        assert config.risk_weight == 0.3
+        # Updated weights for better shelter distribution
+        assert config.distance_weight == 0.35
+        assert config.risk_weight == 0.25
+        assert config.capacity_weight == 0.25  # Increased from 0.1
+        assert config.min_flow_threshold == 20  # Lowered from 100
         assert config.n_wolves == 30
         assert config.max_iterations == 100
 

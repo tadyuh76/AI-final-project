@@ -81,8 +81,25 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
     def _initialize_problem(self) -> None:
         """Khởi tạo các chiều của bài toán và tính trước các ma trận."""
-        self.zones = self.network.get_population_zones()
+        all_zones = self.network.get_population_zones()
         self.shelters = self.network.get_shelters()
+
+        # Filter zones: only include zones that need evacuation (in hazard areas)
+        self.zones = []
+        self._zone_risks = []  # Store zone risks for sorting
+        for z in all_zones:
+            zone_risk = self.network.get_total_risk_at(z.lat, z.lon)
+            if zone_risk >= self.config.min_zone_risk_for_evacuation:
+                self.zones.append(z)
+                self._zone_risks.append(zone_risk)
+
+        # Sort zones by risk (highest first) for priority evacuation
+        if self.zones:
+            sorted_pairs = sorted(zip(self.zones, self._zone_risks),
+                                  key=lambda x: (-x[1], -x[0].population))
+            self.zones = [z for z, _ in sorted_pairs]
+            self._zone_risks = [r for _, r in sorted_pairs]
+
         self.n_zones = len(self.zones)
         self.n_shelters = len(self.shelters)
 
@@ -171,19 +188,22 @@ class GreyWolfOptimizer(BaseAlgorithm):
         time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Chuẩn hóa
 
         # 2. Chi phí rủi ro - HEAVILY penalize routes through hazard zones
-        # Block routes where risk > 0.7 by adding massive penalty
-        risk_penalty_matrix = np.where(self._risk_matrix > 0.7, 1000.0, self._risk_matrix * 10.0)
+        # Block routes where risk > 0.6 by adding massive penalty (standardized threshold)
+        risk_penalty_matrix = np.where(self._risk_matrix > 0.6, 1000.0, self._risk_matrix * 10.0)
         risk_cost = np.sum(flows * risk_penalty_matrix) / 1000.0
 
-        # 3. Phạt vi phạm sức chứa - chuẩn hóa
+        # 3. Phạt vi phạm sức chứa - stronger penalty to enforce hard constraints
         shelter_loads = flows.sum(axis=0)
         capacity_violations = np.maximum(0, shelter_loads - capacities)
-        capacity_penalty = np.sum(capacity_violations / (capacities + 1)) * 10  # Vi phạm tương đối
+        # Exponential penalty: small violations = small penalty, large violations = huge penalty
+        relative_violations = capacity_violations / (capacities + 1)
+        capacity_penalty = np.sum(relative_violations ** 2) * 100 + np.sum(capacity_violations > 0) * 50
 
         # 4. Phạt mất cân bằng luồng (ưu tiên phân phối đồng đều)
+        # Increased multiplier from 5 to 50 to strongly penalize uneven distribution
         if capacities.sum() > 0:
             utilization = shelter_loads / (capacities + 1)
-            balance_penalty = np.std(utilization) * 5
+            balance_penalty = np.std(utilization) * 50  # Much stronger balance enforcement
         else:
             balance_penalty = 0
 
@@ -292,10 +312,11 @@ class GreyWolfOptimizer(BaseAlgorithm):
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
 
-        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
-        total_population = sum(z.population for z in self.zones)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(dân số cần sơ tán, tổng sức chứa)
+        # self.zones already filtered to only include zones needing evacuation
+        population_needing_evacuation = sum(z.population for z in self.zones)
         total_capacity = sum(s.capacity for s in self.shelters)
-        max_possible = min(total_population, total_capacity)
+        max_possible = min(population_needing_evacuation, total_capacity)
         self._metrics.coverage_rate = (
             plan.total_evacuees / max_possible if max_possible > 0 else 0
         )
@@ -323,8 +344,9 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Theo dõi mức độ sử dụng của nơi trú ẩn
         shelter_occupancy = np.zeros(self.n_shelters)
 
-        # Track zones that have been assigned
+        # Track zones that have been assigned and remaining population
         zone_assigned = [False] * self.n_zones
+        zone_remaining = [z.population for z in self.zones]  # Track remaining population per zone
 
         for i, zone in enumerate(self.zones):
             # Sort shelters by preference for this zone (lower risk, closer distance)
@@ -335,22 +357,30 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 flow = flows[i, j]
                 available = capacities[j] - shelter_occupancy[j]
 
-                # Skip if no capacity or high risk route
+                # Skip if no capacity or high risk route (use consistent 0.6 threshold)
                 if available < self.config.min_flow_threshold:
                     continue
-                if risk > 0.5:  # Skip high-risk routes (more conservative)
+                if risk > 0.6:  # Standardized risk threshold
                     continue
 
                 # Score: prefer higher flow, lower risk, closer distance
-                score = flow * 10 - risk * 100 - dist
+                # Also consider capacity availability more strongly
+                capacity_score = min(1.0, available / (zone_remaining[i] + 1)) * 50
+                score = flow * 10 - risk * 100 - dist + capacity_score
                 shelter_scores.append((j, score, flow, available))
 
             # Sort by score (higher is better)
             shelter_scores.sort(key=lambda x: -x[1])
 
             for j, score, flow, available in shelter_scores:
+                if zone_remaining[i] < self.config.min_flow_threshold:
+                    break  # Zone fully assigned
+
                 shelter = self.shelters[j]
-                actual_flow = min(int(flow), int(available))
+                # Use remaining population, not original flow
+                actual_flow = min(int(zone_remaining[i]), int(available))
+                # Ensure we don't exceed the GWO-suggested flow too much
+                actual_flow = min(actual_flow, max(int(flow), int(available // 2)))
 
                 if actual_flow < self.config.min_flow_threshold:
                     continue
@@ -373,13 +403,13 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 )
                 plan.add_route(route)
                 shelter_occupancy[j] += actual_flow
+                zone_remaining[i] -= actual_flow
                 zone_assigned[i] = True
-                break  # One route per zone in basic GWO
 
-        # Ensure all zones have at least one route - assign to nearest safe shelter
+        # Ensure all zones have at least one route - assign remaining population to nearest safe shelter
         for i, zone in enumerate(self.zones):
-            if zone_assigned[i]:
-                continue
+            if zone_remaining[i] < self.config.min_flow_threshold:
+                continue  # Zone already fully assigned
 
             # Find nearest safe shelter with capacity
             best_shelter = None
@@ -388,11 +418,11 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
             for j, shelter in enumerate(self.shelters):
                 available = capacities[j] - shelter_occupancy[j]
-                if available < 100:  # Need at least some capacity
+                if available < self.config.min_flow_threshold:  # Use config threshold
                     continue
 
                 risk = self._risk_matrix[i, j]
-                if risk > 0.6:  # Skip high risk in fallback
+                if risk > 0.6:  # Consistent risk threshold
                     continue
 
                 dist = self._distance_matrix[i, j]
@@ -401,10 +431,23 @@ class GreyWolfOptimizer(BaseAlgorithm):
                     best_shelter = shelter
                     best_j = j
 
+            # If no safe shelter found, try with higher risk tolerance for zones near hazard
+            if best_shelter is None:
+                for j, shelter in enumerate(self.shelters):
+                    available = capacities[j] - shelter_occupancy[j]
+                    if available < self.config.min_flow_threshold:
+                        continue
+
+                    dist = self._distance_matrix[i, j]
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_shelter = shelter
+                        best_j = j
+
             if best_shelter is not None:
                 # Assign remaining population
                 available = capacities[best_j] - shelter_occupancy[best_j]
-                actual_flow = min(zone.population, int(available))
+                actual_flow = min(zone_remaining[i], int(available))
 
                 if actual_flow > 0:
                     path = self._find_path(zone, best_shelter)
@@ -468,8 +511,8 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 if not edge or edge.is_blocked:
                     continue
 
-                # Skip high-risk edges completely
-                if edge.flood_risk > 0.7:
+                # Skip high-risk edges completely (standardized 0.6 threshold)
+                if edge.flood_risk > 0.6:
                     continue
 
                 # Calculate cost with hazard penalty

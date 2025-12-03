@@ -66,10 +66,25 @@ class HybridGBFSGWO(BaseAlgorithm):
         """
         start_time = self._start_timer()
 
-        zones = self.network.get_population_zones()
+        all_zones = self.network.get_population_zones()
         shelters = self.network.get_shelters()
 
-        if not zones or not shelters:
+        if not all_zones or not shelters:
+            self._stop_timer(start_time)
+            return EvacuationPlan(algorithm_type=AlgorithmType.HYBRID), self._metrics
+
+        # Filter zones: only evacuate zones that are in hazard areas
+        zones_with_risk = []
+        for z in all_zones:
+            zone_risk = self.network.get_total_risk_at(z.lat, z.lon)
+            if zone_risk >= self.config.min_zone_risk_for_evacuation:
+                zones_with_risk.append((z, zone_risk))
+
+        # Sort by risk (highest first) then by population
+        zones_with_risk.sort(key=lambda x: (-x[1], -x[0].population))
+        zones = [z for z, _ in zones_with_risk]
+
+        if not zones:
             self._stop_timer(start_time)
             return EvacuationPlan(algorithm_type=AlgorithmType.HYBRID), self._metrics
 
@@ -81,7 +96,8 @@ class HybridGBFSGWO(BaseAlgorithm):
             n_wolves=self.config.n_wolves,
             max_iterations=self.gwo_iterations,
             distance_weight=self.config.distance_weight,
-            risk_weight=self.config.risk_weight
+            risk_weight=self.config.risk_weight,
+            min_zone_risk_for_evacuation=self.config.min_zone_risk_for_evacuation
         )
         self.gwo = GreyWolfOptimizer(self.network, gwo_config)
 
@@ -103,6 +119,8 @@ class HybridGBFSGWO(BaseAlgorithm):
         # ============ Giai đoạn 2: Tìm đường GBFS ============
         self.report_progress(self.gwo_iterations, gwo_metrics.final_cost, {'phase': 'gbfs_start'})
 
+        # Use filtered zones from GWO (already sorted by risk)
+        zones = self.gwo.zones  # GWO already filtered zones
         plan = self._apply_gbfs_pathfinding(flow_matrix, zones, shelters)
 
         # ============ Giai đoạn 3: Tinh chỉnh ============
@@ -125,10 +143,11 @@ class HybridGBFSGWO(BaseAlgorithm):
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
 
-        # Tỷ lệ bao phủ: số người được sơ tán / min(tổng dân số, tổng sức chứa)
-        total_population = sum(z.population for z in zones)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(dân số cần sơ tán, tổng sức chứa)
+        # zones already filtered to only include zones needing evacuation
+        population_needing_evacuation = sum(z.population for z in zones)
         total_capacity = sum(s.capacity for s in shelters)
-        max_possible = min(total_population, total_capacity)
+        max_possible = min(population_needing_evacuation, total_capacity)
         self._metrics.coverage_rate = (
             plan.total_evacuees / max_possible if max_possible > 0 else 0
         )
@@ -166,8 +185,9 @@ class HybridGBFSGWO(BaseAlgorithm):
         # Theo dõi mức độ sử dụng nơi trú ẩn
         shelter_occupancy = {s.id: 0 for s in shelters}
 
-        # Track which zones got routes
+        # Track which zones got routes and remaining population
         zones_with_routes = set()
+        zone_remaining = {z.id: z.population for z in zones}
 
         # Xử lý từng khu vực
         for i, zone in enumerate(zones):
@@ -181,11 +201,17 @@ class HybridGBFSGWO(BaseAlgorithm):
             zone_flows.sort(key=lambda x: -x[1])  # Sắp xếp theo luồng giảm dần
 
             for j, target_flow in zone_flows:
+                # Check if zone already fully assigned
+                if zone_remaining[zone.id] < self.config.min_flow_threshold:
+                    break
+
                 shelter = shelters[j]
 
                 # Kiểm tra sức chứa khả dụng
                 available = shelter.capacity - shelter_occupancy[shelter.id]
-                actual_flow = min(target_flow, int(available))
+                # Use remaining population, capped by available capacity and target flow
+                actual_flow = min(zone_remaining[zone.id], int(available))
+                actual_flow = min(actual_flow, max(target_flow, int(available // 2)))
 
                 if actual_flow < self.config.min_flow_threshold:
                     continue
@@ -210,8 +236,9 @@ class HybridGBFSGWO(BaseAlgorithm):
                     )
                     plan.add_route(route)
                     shelter_occupancy[shelter.id] += actual_flow
+                    zone_remaining[zone.id] -= actual_flow
                     zones_with_routes.add(zone.id)
-                    break  # One route per zone
+                    # Continue to assign remaining population to other shelters
 
             # Báo cáo tiến trình
             iteration = self.gwo_iterations + i + 1
@@ -221,16 +248,17 @@ class HybridGBFSGWO(BaseAlgorithm):
 
         # FALLBACK: Ensure all zones have routes - find path to ANY safe shelter
         for i, zone in enumerate(zones):
-            if zone.id in zones_with_routes:
+            # Check if zone still has remaining population to assign
+            if zone_remaining.get(zone.id, 0) < self.config.min_flow_threshold:
                 continue
 
-            # Try to find path to any shelter with capacity
+            # Try to find path to any shelter with capacity (use consistent 0.6 risk threshold)
             safe_shelters = [s for s in shelters
                            if shelter_occupancy.get(s.id, 0) < s.capacity
-                           and self.network.get_total_risk_at(s.lat, s.lon) < 0.5]
+                           and self.network.get_total_risk_at(s.lat, s.lon) < 0.6]
 
             if not safe_shelters:
-                # Fallback to any shelter with capacity
+                # Fallback to any shelter with capacity (for zones in hazard center)
                 safe_shelters = [s for s in shelters
                                if shelter_occupancy.get(s.id, 0) < s.capacity]
 
@@ -239,7 +267,7 @@ class HybridGBFSGWO(BaseAlgorithm):
 
                 if path and found_shelter:
                     available = found_shelter.capacity - shelter_occupancy.get(found_shelter.id, 0)
-                    actual_flow = min(zone.population, int(available))
+                    actual_flow = min(zone_remaining.get(zone.id, 0), int(available))
 
                     if actual_flow > 0:
                         distance = self.gbfs._calculate_path_distance(path)
@@ -257,6 +285,7 @@ class HybridGBFSGWO(BaseAlgorithm):
                         )
                         plan.add_route(route)
                         shelter_occupancy[found_shelter.id] = shelter_occupancy.get(found_shelter.id, 0) + actual_flow
+                        zone_remaining[zone.id] = zone_remaining.get(zone.id, 0) - actual_flow
 
         return plan
 

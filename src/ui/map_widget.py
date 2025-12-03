@@ -201,7 +201,10 @@ class ShelterItem(QGraphicsRectItem):
 
 
 class HazardZoneItem(QGraphicsEllipseItem):
-    """Hiển thị vùng nguy hiểm với hiệu ứng pulse."""
+    """Hiển thị vùng nguy hiểm với hiệu ứng pulse được tối ưu."""
+
+    # Cache màu cơ bản - chia sẻ giữa tất cả instances
+    _base_color: Optional[QColor] = None
 
     def __init__(self, hazard: HazardZone, x: float, y: float, radius_pixels: float):
         super().__init__(-radius_pixels, -radius_pixels,
@@ -214,15 +217,36 @@ class HazardZoneItem(QGraphicsEllipseItem):
 
         self.pulse_phase = 0.5
         self.pulse_direction = 1
+        self._frame_counter = 0  # Đếm frame để skip updates
+        self._last_alpha = -1  # Cache alpha cuối cùng để skip nếu không đổi
+
+        # Cache base color một lần
+        if HazardZoneItem._base_color is None:
+            HazardZoneItem._base_color = hex_to_qcolor(COLORS.danger)
 
         self._update_appearance()
+        self._update_tooltip()  # Tách tooltip ra, không cần update mỗi frame
+
+    def _update_tooltip(self):
+        """Cập nhật tooltip - chỉ gọi khi hazard thay đổi."""
+        self.setToolTip(
+            f"<b>Vùng Nguy Hiểm</b><br>"
+            f"Loại: {self.hazard.hazard_type}<br>"
+            f"Bán kính: {self.hazard.radius_km:.1f} km<br>"
+            f"Rủi ro: {self.hazard.risk_level:.0%}"
+        )
 
     def _update_appearance(self):
         """Cập nhật giao diện với gradient và opacity."""
-        gradient = QRadialGradient(0, 0, self.base_radius)
-        base_color = hex_to_qcolor(COLORS.danger)
-
         alpha = int(180 * self.pulse_phase)
+
+        # Skip nếu alpha không thay đổi đáng kể (±5)
+        if abs(alpha - self._last_alpha) < 5:
+            return
+        self._last_alpha = alpha
+
+        base_color = HazardZoneItem._base_color
+        gradient = QRadialGradient(0, 0, self.base_radius)
         gradient.setColorAt(0, QColor(base_color.red(), base_color.green(),
                                       base_color.blue(), alpha))
         gradient.setColorAt(0.7, QColor(base_color.red(), base_color.green(),
@@ -231,23 +255,24 @@ class HazardZoneItem(QGraphicsEllipseItem):
                                       base_color.blue(), 0))
 
         self.setBrush(QBrush(gradient))
-        self.setPen(QPen(hex_to_qcolor(COLORS.danger, int(200 * self.pulse_phase)), 2))
-
-        self.setToolTip(
-            f"<b>Vùng Nguy Hiểm</b><br>"
-            f"Loại: {self.hazard.hazard_type}<br>"
-            f"Bán kính: {self.hazard.radius_km:.1f} km<br>"
-            f"Rủi ro: {self.hazard.risk_level:.0%}"
-        )
+        self.setPen(QPen(QColor(base_color.red(), base_color.green(),
+                                base_color.blue(), int(200 * self.pulse_phase)), 2))
 
     def pulse_tick(self):
-        """Cập nhật hiệu ứng pulse."""
-        self.pulse_phase += 0.03 * self.pulse_direction
+        """Cập nhật hiệu ứng pulse - chỉ update mỗi 3 frames."""
+        self._frame_counter += 1
+        if self._frame_counter < 3:  # Skip 2 out of 3 frames
+            return
+        self._frame_counter = 0
+
+        self.pulse_phase += 0.09 * self.pulse_direction  # 0.03 * 3 để bù lại
 
         if self.pulse_phase >= 1.0:
             self.pulse_direction = -1
+            self.pulse_phase = 1.0
         elif self.pulse_phase <= 0.3:
             self.pulse_direction = 1
+            self.pulse_phase = 0.3
 
         self._update_appearance()
 
@@ -257,7 +282,9 @@ class HazardZoneItem(QGraphicsEllipseItem):
         self.hazard.risk_level = risk_level
         self.setRect(-radius_pixels, -radius_pixels,
                      radius_pixels * 2, radius_pixels * 2)
+        self._last_alpha = -1  # Force update
         self._update_appearance()
+        self._update_tooltip()
 
 
 # Màu sắc khác nhau cho từng quận
@@ -341,8 +368,14 @@ class RouteItem(QGraphicsPathItem):
         self.flow = flow
         self.risk = risk
 
+        # Cache segment data để tránh tính toán lại mỗi frame
+        self._segments: List[Tuple[QPointF, QPointF, float]] = []
+        self._total_length: float = 0.0
+        self._cumulative_lengths: List[float] = []  # Độ dài tích lũy cho binary search
+
         self.setZValue(8)
         self._build_path()
+        self._cache_segments()  # Cache segment lengths một lần
         self._update_style()
 
     def _build_path(self):
@@ -357,6 +390,25 @@ class RouteItem(QGraphicsPathItem):
             path.lineTo(self.path_points[i])
 
         self.setPath(path)
+
+    def _cache_segments(self):
+        """Cache segment lengths - chỉ gọi một lần khi khởi tạo."""
+        self._segments = []
+        self._cumulative_lengths = [0.0]
+        self._total_length = 0.0
+
+        if len(self.path_points) < 2:
+            return
+
+        for i in range(len(self.path_points) - 1):
+            p1 = self.path_points[i]
+            p2 = self.path_points[i + 1]
+            dx = p2.x() - p1.x()
+            dy = p2.y() - p1.y()
+            length = math.sqrt(dx * dx + dy * dy)
+            self._segments.append((p1, p2, length))
+            self._total_length += length
+            self._cumulative_lengths.append(self._total_length)
 
     def _update_style(self):
         """Cập nhật kiểu dáng dựa trên flow và risk."""
@@ -380,50 +432,87 @@ class RouteItem(QGraphicsPathItem):
         self._update_style()
 
     def get_point_at_progress(self, progress: float) -> QPointF:
-        """Lấy điểm trên đường tại vị trí progress (0-1)."""
-        if not self.path_points or len(self.path_points) < 2:
-            return QPointF(0, 0)
+        """Lấy điểm trên đường tại vị trí progress (0-1).
 
-        total_length = 0.0
-        segments = []
-        for i in range(len(self.path_points) - 1):
-            p1 = self.path_points[i]
-            p2 = self.path_points[i + 1]
-            length = math.sqrt((p2.x() - p1.x())**2 + (p2.y() - p1.y())**2)
-            segments.append((p1, p2, length))
-            total_length += length
+        Sử dụng cached segment data để tránh tính toán lại.
+        """
+        if not self._segments or self._total_length == 0:
+            return self.path_points[0] if self.path_points else QPointF(0, 0)
 
-        if total_length == 0:
-            return self.path_points[0]
+        # Clamp progress
+        progress = max(0.0, min(1.0, progress))
+        target_dist = progress * self._total_length
 
-        target_dist = progress * total_length
-        current_dist = 0.0
+        # Binary search để tìm segment chứa target_dist
+        low, high = 0, len(self._segments) - 1
+        while low < high:
+            mid = (low + high) // 2
+            if self._cumulative_lengths[mid + 1] < target_dist:
+                low = mid + 1
+            else:
+                high = mid
 
-        for p1, p2, length in segments:
-            if current_dist + length >= target_dist:
-                segment_progress = (target_dist - current_dist) / length if length > 0 else 0
-                x = p1.x() + (p2.x() - p1.x()) * segment_progress
-                y = p1.y() + (p2.y() - p1.y()) * segment_progress
-                return QPointF(x, y)
-            current_dist += length
+        # Interpolate trong segment tìm được
+        p1, p2, length = self._segments[low]
+        segment_start = self._cumulative_lengths[low]
 
-        return self.path_points[-1]
+        if length > 0:
+            segment_progress = (target_dist - segment_start) / length
+            x = p1.x() + (p2.x() - p1.x()) * segment_progress
+            y = p1.y() + (p2.y() - p1.y()) * segment_progress
+            return QPointF(x, y)
+
+        return p1
 
 
 class EvacueeParticle(QGraphicsEllipseItem):
     """Hạt đại diện cho nhóm người sơ tán đang di chuyển."""
 
+    # Cache colors để tránh tạo mới mỗi frame
+    _color_cyan: Optional[QColor] = None
+    _color_warning: Optional[QColor] = None
+    _color_success: Optional[QColor] = None
+    _pen_color: Optional[QPen] = None
+
+    # Color state: 0=cyan, 1=warning, 2=success
+    COLOR_CYAN = 0
+    COLOR_WARNING = 1
+    COLOR_SUCCESS = 2
+
     def __init__(self, size: float = 6):
         super().__init__(-size/2, -size/2, size, size)
         self.setZValue(20)
+        self._current_color_state = -1  # Không có màu
 
-        color = hex_to_qcolor(COLORS.cyan, 255)
-        self.setBrush(QBrush(color))
-        self.setPen(QPen(hex_to_qcolor(COLORS.text), 1))
+        # Cache colors một lần (class-level)
+        if EvacueeParticle._color_cyan is None:
+            EvacueeParticle._color_cyan = hex_to_qcolor(COLORS.cyan, 255)
+            EvacueeParticle._color_warning = hex_to_qcolor(COLORS.warning, 255)
+            EvacueeParticle._color_success = hex_to_qcolor(COLORS.success, 255)
+            EvacueeParticle._pen_color = QPen(hex_to_qcolor(COLORS.text), 1)
 
-    def set_color(self, color: QColor):
-        """Cập nhật màu của hạt."""
-        self.setBrush(QBrush(color))
+        self.setBrush(QBrush(EvacueeParticle._color_cyan))
+        self.setPen(EvacueeParticle._pen_color)
+        self._current_color_state = self.COLOR_CYAN
+
+    def set_color_state(self, state: int):
+        """Cập nhật màu của hạt theo state - skip nếu không đổi."""
+        if state == self._current_color_state:
+            return  # Skip nếu màu không đổi
+
+        self._current_color_state = state
+        if state == self.COLOR_CYAN:
+            self.setBrush(QBrush(EvacueeParticle._color_cyan))
+        elif state == self.COLOR_WARNING:
+            self.setBrush(QBrush(EvacueeParticle._color_warning))
+        else:  # COLOR_SUCCESS
+            self.setBrush(QBrush(EvacueeParticle._color_success))
+
+    def reset(self):
+        """Reset particle để tái sử dụng từ pool."""
+        self._current_color_state = self.COLOR_CYAN
+        self.setBrush(QBrush(EvacueeParticle._color_cyan))
+        self.setVisible(True)
 
 
 class MapCanvas(QGraphicsView):
@@ -677,14 +766,29 @@ class MapCanvas(QGraphicsView):
         # Add particles for this route
         self._add_route_particles(route_id, item, flow)
 
+    def _get_particle_from_pool(self) -> EvacueeParticle:
+        """Lấy particle từ pool hoặc tạo mới nếu pool rỗng."""
+        if self._particle_pool:
+            particle = self._particle_pool.pop()
+            particle.reset()
+            return particle
+        return EvacueeParticle(8)
+
+    def _return_particle_to_pool(self, particle: EvacueeParticle):
+        """Trả particle về pool để tái sử dụng."""
+        particle.setVisible(False)
+        self._particle_pool.append(particle)
+
     def _add_route_particles(self, route_id: str, route_item: RouteItem, flow: int):
-        """Add animated particles along a route."""
+        """Add animated particles along a route - sử dụng particle pooling."""
         # Add 3-5 particles per route based on flow
         num_particles = min(5, max(2, flow // 2000))
 
         for i in range(num_particles):
-            particle = EvacueeParticle(8)
-            self._scene.addItem(particle)
+            # Sử dụng particle từ pool thay vì tạo mới
+            particle = self._get_particle_from_pool()
+            if particle.scene() != self._scene:
+                self._scene.addItem(particle)
             self._particles.append(particle)
 
             # Start at different positions along the route
@@ -709,16 +813,16 @@ class MapCanvas(QGraphicsView):
             self._scene.removeItem(item)
         self._route_items.clear()
 
-        # Clear particles
+        # Return particles to pool thay vì xóa
         for particle in self._particles:
-            self._scene.removeItem(particle)
+            self._return_particle_to_pool(particle)
         self._particles.clear()
         self._active_groups.clear()
 
     def start_animation(self):
         """Bắt đầu hoạt hình."""
         if not self._animation_running:
-            self._animation_timer.start(33)  # ~30 FPS
+            self._animation_timer.start(50)  # ~20 FPS (tối ưu hơn 30 FPS)
             self._animation_running = True
 
     def stop_animation(self):
@@ -727,8 +831,8 @@ class MapCanvas(QGraphicsView):
         self._animation_running = False
 
     def _animation_tick(self):
-        """Cập nhật hoạt hình mỗi frame."""
-        # Pulse hazard zones
+        """Cập nhật hoạt hình mỗi frame - được tối ưu."""
+        # Pulse hazard zones (đã được tối ưu trong HazardZoneItem)
         for hazard_item in self._hazard_items.values():
             hazard_item.pulse_tick()
 
@@ -742,13 +846,14 @@ class MapCanvas(QGraphicsView):
             pos = group['route_item'].get_point_at_progress(group['progress'])
             group['particle'].setPos(pos)
 
-            # Color based on progress
-            if group['progress'] > 0.7:
-                group['particle'].set_color(hex_to_qcolor(COLORS.success, 255))
-            elif group['progress'] > 0.3:
-                group['particle'].set_color(hex_to_qcolor(COLORS.warning, 255))
+            # Color based on progress - sử dụng color state để skip unchanged
+            progress = group['progress']
+            if progress > 0.7:
+                group['particle'].set_color_state(EvacueeParticle.COLOR_SUCCESS)
+            elif progress > 0.3:
+                group['particle'].set_color_state(EvacueeParticle.COLOR_WARNING)
             else:
-                group['particle'].set_color(hex_to_qcolor(COLORS.cyan, 255))
+                group['particle'].set_color_state(EvacueeParticle.COLOR_CYAN)
 
     def update_zone_progress(self, zone_id: str, evacuated: int):
         """Cập nhật tiến độ sơ tán của khu vực."""

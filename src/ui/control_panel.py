@@ -302,22 +302,18 @@ class ControlPanel(QWidget):
 
         layout.addWidget(algo_group)
 
-        # ===== Cấp độ bão =====
-        typhoon_group = QGroupBox("Kịch bản bão")
-        typhoon_layout = QVBoxLayout(typhoon_group)
+        # ===== Dân số sơ tán =====
+        pop_group = QGroupBox("Dân số sơ tán")
+        pop_layout = QVBoxLayout(pop_group)
 
-        self.typhoon_selector = TyphoonCategorySelector()
-        self.typhoon_selector.category_changed.connect(self._on_config_changed)
-        typhoon_layout.addWidget(self.typhoon_selector)
-
-        # Population slider
+        # Population slider - cho phép từ 1% đến 100%
         self.population_slider = LabeledSlider(
-            "Dân số (%)", 10, 100, 50, decimals=0
+            "Dân số (%)", 1, 100, 50, decimals=0
         )
         self.population_slider.value_changed.connect(self._on_config_changed)
-        typhoon_layout.addWidget(self.population_slider)
+        pop_layout.addWidget(self.population_slider)
 
-        layout.addWidget(typhoon_group)
+        layout.addWidget(pop_group)
 
         # ===== Tham số thuật toán =====
         params_group = QGroupBox("Tham số thuật toán")
@@ -468,17 +464,6 @@ class ControlPanel(QWidget):
         self.hazard_radius_slider = LabeledSlider("Bán kính (km)", 0.5, 5.0, 1.5, decimals=1)
         hazard_layout.addWidget(self.hazard_radius_slider)
 
-        # Hazard type combo
-        type_layout = QHBoxLayout()
-        type_label = QLabel("Loại")
-        type_label.setMinimumWidth(80)
-        type_layout.addWidget(type_label)
-
-        self.hazard_type_combo = QComboBox()
-        self.hazard_type_combo.addItems(["flood", "wind", "debris"])
-        type_layout.addWidget(self.hazard_type_combo, 1)
-        hazard_layout.addLayout(type_layout)
-
         hazard_layout.addSpacing(8)
 
         # === Zone management ===
@@ -579,7 +564,6 @@ class ControlPanel(QWidget):
         return {
             'radius_km': self.hazard_radius_slider.value(),
             'risk_level': self.hazard_severity_slider.value() / 100.0,
-            'hazard_type': self.hazard_type_combo.currentText()
         }
 
     def get_randomization_params(self) -> Dict[str, Any]:
@@ -690,7 +674,6 @@ class ControlPanel(QWidget):
         """Lấy cấu hình hiện tại."""
         return {
             'algorithm': self._get_algorithm_type(),
-            'typhoon_category': self.typhoon_selector.value(),
             'population_percent': self.population_slider.value(),
             'weights': {
                 'distance': self.weight_distance.value(),

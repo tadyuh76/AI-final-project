@@ -77,7 +77,7 @@ class ProgressMetricCard(QFrame):
         super().__init__(parent)
         self.setProperty("card", True)
         self.setMinimumHeight(80)
-        self.setMinimumWidth(200)
+        self.setMinimumWidth(280)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -153,7 +153,7 @@ class ShelterStatusCard(QFrame):
         super().__init__(parent)
         self.setProperty("card", True)
         self.setMinimumHeight(70)
-        self.setMinimumWidth(180)
+        self.setMinimumWidth(250)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
@@ -350,7 +350,7 @@ class RouteStatusCard(QFrame):
         super().__init__(parent)
         self.setProperty("card", True)
         self.setMinimumHeight(70)
-        self.setMinimumWidth(200)
+        self.setMinimumWidth(280)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)

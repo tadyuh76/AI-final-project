@@ -427,15 +427,18 @@ class RouteItem(QGraphicsPathItem):
     def _update_style(self):
         """Cập nhật kiểu dáng dựa trên flow.
 
-        Sử dụng màu xám thống nhất cho tất cả tuyến đường để đơn giản hóa
-        hiển thị. Độ rộng đường tỷ lệ với lưu lượng.
+        Sử dụng màu tím cho tuyến đường sơ tán để phân biệt với:
+        - Đường tĩnh (xám)
+        - Khu dân cư (cyan)
+        - Nơi trú ẩn (xanh lá)
+        - Vùng nguy hiểm (đỏ)
+        Độ rộng đường tỷ lệ với lưu lượng.
         """
         # Độ rộng tỷ lệ với flow (3-12 pixels)
         width = max(3, min(12, 3 + self.flow * 0.0005))
 
-        # Màu xám thống nhất cho tất cả tuyến đường
-        # Opacity cao hơn một chút để dễ nhìn
-        color = hex_to_qcolor(COLORS.text_muted, 180)
+        # Màu tím cho tuyến đường sơ tán - nổi bật và khác biệt
+        color = hex_to_qcolor(COLORS.purple, 200)
 
         self.setPen(QPen(color, width, Qt.PenStyle.SolidLine,
                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
@@ -631,6 +634,18 @@ class MapCanvas(QGraphicsView):
         # Active evacuee groups for animation
         self._active_groups: List[Dict[str, Any]] = []
 
+        # Flag để fit view khi widget được hiển thị lần đầu
+        self._needs_initial_fit = True
+
+    def showEvent(self, event):
+        """Xử lý khi widget được hiển thị - fit view lần đầu."""
+        super().showEvent(event)
+        if self._needs_initial_fit and self._network:
+            # Dùng QTimer.singleShot để đảm bảo widget đã có kích thước chính xác
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, self.fit_to_view)
+            self._needs_initial_fit = False
+
     def _draw_static_grid(self):
         """Vẽ grid tĩnh một lần vào scene thay vì vẽ lại mỗi frame."""
         if not self._network:
@@ -678,9 +693,12 @@ class MapCanvas(QGraphicsView):
         # Vẽ grid tĩnh sau khi có scene rect
         self._draw_static_grid()
 
-        # Fit to view
-        self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
-        self._zoom_level = 1.0
+        # Fit to view - nếu widget đã hiển thị, fit ngay
+        # Nếu chưa hiển thị, showEvent sẽ xử lý
+        if self.isVisible():
+            self.fit_to_view()
+        else:
+            self._needs_initial_fit = True
 
     def _clear_all(self):
         """Xóa tất cả các item khỏi scene."""

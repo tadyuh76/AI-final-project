@@ -212,6 +212,93 @@ class ShelterStatusCard(QFrame):
             self.open_label.setStyleSheet(f"color: {COLORS.success};")
 
 
+class CapacityRatioCard(QFrame):
+    """Card hiển thị tỷ lệ sức chứa so với dân số cần sơ tán."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setProperty("card", True)
+        self.setMinimumHeight(80)
+        self.setMinimumWidth(200)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(4)
+
+        # Title
+        title = QLabel("Tỷ lệ sức chứa")
+        title.setProperty("muted", True)
+        title.setFont(QFont("Arial", 10))
+        layout.addWidget(title)
+
+        # Main ratio display
+        ratio_row = QHBoxLayout()
+        ratio_row.setSpacing(4)
+
+        self.ratio_label = QLabel("0%")
+        self.ratio_label.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        self.ratio_label.setStyleSheet(f"color: {COLORS.danger};")
+        ratio_row.addWidget(self.ratio_label)
+
+        ratio_row.addStretch()
+        layout.addLayout(ratio_row)
+
+        # Progress bar showing capacity vs population
+        self.capacity_bar = QProgressBar()
+        self.capacity_bar.setTextVisible(False)
+        self.capacity_bar.setMinimumHeight(8)
+        self.capacity_bar.setMaximumHeight(10)
+        self.capacity_bar.setValue(0)
+        layout.addWidget(self.capacity_bar)
+
+        # Details
+        self.details_label = QLabel("Sức chứa: 0 / Dân số: 0")
+        self.details_label.setProperty("muted", True)
+        self.details_label.setFont(QFont("Arial", 9))
+        self.details_label.setWordWrap(True)
+        layout.addWidget(self.details_label)
+
+    def update_ratio(self, total_capacity: int, total_population: int, current_occupancy: int = 0):
+        """Cập nhật tỷ lệ sức chứa.
+
+        Args:
+            total_capacity: Tổng sức chứa của tất cả nơi trú ẩn
+            total_population: Tổng dân số cần sơ tán
+            current_occupancy: Số người hiện đang ở nơi trú ẩn
+        """
+        if total_population > 0:
+            ratio = total_capacity / total_population
+            ratio_percent = min(100, ratio * 100)
+        else:
+            ratio = 1.0
+            ratio_percent = 100
+
+        self.ratio_label.setText(f"{ratio_percent:.1f}%")
+        self.capacity_bar.setValue(int(ratio_percent))
+
+        # Format numbers with K/M suffix for readability
+        def format_num(n):
+            if n >= 1_000_000:
+                return f"{n/1_000_000:.1f}M"
+            elif n >= 1_000:
+                return f"{n/1_000:.0f}K"
+            return str(n)
+
+        remaining_capacity = max(0, total_capacity - current_occupancy)
+        self.details_label.setText(
+            f"Sức chứa: {format_num(total_capacity)} / "
+            f"Dân số: {format_num(total_population)}"
+        )
+
+        # Color based on ratio - realistic thresholds for evacuation
+        if ratio >= 0.8:  # 80%+ capacity - good
+            self.ratio_label.setStyleSheet(f"color: {COLORS.success};")
+        elif ratio >= 0.3:  # 30-80% - warning
+            self.ratio_label.setStyleSheet(f"color: {COLORS.warning};")
+        else:  # <30% - critical shortage
+            self.ratio_label.setStyleSheet(f"color: {COLORS.danger};")
+
+
 class TimeEstimateCard(QFrame):
     """Card hiển thị ước tính thời gian."""
 
@@ -382,6 +469,10 @@ class Dashboard(QWidget):
         self.shelters_card = ShelterStatusCard()
         cards_layout.addWidget(self.shelters_card)
 
+        # Capacity ratio card - shows shelter capacity vs population
+        self.capacity_card = CapacityRatioCard()
+        cards_layout.addWidget(self.capacity_card)
+
         # Routes card
         self.routes_card = RouteStatusCard()
         cards_layout.addWidget(self.routes_card)
@@ -448,9 +539,20 @@ class Dashboard(QWidget):
             remaining_capacity = metrics.get('remaining_shelter_capacity', 0)
             self.shelters_card.update_status(open_shelters, total_shelters, remaining_capacity)
 
+        # Capacity ratio - shelter capacity vs population to evacuate
+        total_capacity = metrics.get('total_shelter_capacity', 0)
+        total_population = metrics.get('total_population', total)  # fallback to evacuated + remaining
+        current_occupancy = metrics.get('total_evacuated', 0)
+        if total_capacity > 0 or total_population > 0:
+            self.capacity_card.update_ratio(total_capacity, total_population, current_occupancy)
+
     def update_shelter_status(self, open_count: int, total_count: int, remaining_capacity: int):
         """Cập nhật trạng thái nơi trú ẩn."""
         self.shelters_card.update_status(open_count, total_count, remaining_capacity)
+
+    def update_capacity_ratio(self, total_capacity: int, total_population: int, current_occupancy: int = 0):
+        """Cập nhật tỷ lệ sức chứa."""
+        self.capacity_card.update_ratio(total_capacity, total_population, current_occupancy)
 
     def reset(self):
         """Đặt lại dashboard về trạng thái ban đầu."""
@@ -460,5 +562,6 @@ class Dashboard(QWidget):
         self.time_card.update_time(0, 0)
         self.routes_card.update_status(0, 0, 0)
         self.shelters_card.update_status(0, 0, 0)
+        self.capacity_card.update_ratio(0, 0, 0)
         self.risk_card.set_value("0%")
         self.risk_card.set_color(COLORS.warning)

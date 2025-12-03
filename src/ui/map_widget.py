@@ -192,19 +192,34 @@ class ShelterItem(QGraphicsRectItem):
         super().mousePressEvent(event)
 
     def update_occupancy(self, occupancy: int):
-        """Cập nhật hiển thị mức lấp đầy."""
+        """Cập nhật hiển thị mức lấp đầy với màu sắc theo mức sử dụng."""
         self.shelter.current_occupancy = occupancy
         rate = self.shelter.occupancy_rate
 
+        # Color-code by utilization: green < 70%, yellow 70-90%, red >= 90%
         if rate >= 0.9:
-            color = hex_to_qcolor(COLORS.danger, 220)
+            fill_color = hex_to_qcolor(COLORS.danger, 220)
+            border_color = hex_to_qcolor(COLORS.danger, 255)
+            # Tăng kích thước khi đầy để dễ nhận biết
+            scale = 1.2
         elif rate >= 0.7:
-            color = hex_to_qcolor(COLORS.warning, 220)
+            fill_color = hex_to_qcolor(COLORS.warning, 220)
+            border_color = hex_to_qcolor(COLORS.warning, 255)
+            scale = 1.1
         else:
-            color = hex_to_qcolor(COLORS.success, 220)
+            fill_color = hex_to_qcolor(COLORS.success, 220)
+            border_color = hex_to_qcolor(COLORS.success_dark, 255)
+            scale = 1.0
 
-        self.setBrush(QBrush(color))
+        self.setBrush(QBrush(fill_color))
+        if not self._is_selected:
+            self.setPen(QPen(border_color, 2))
+            self.setScale(scale)
         self._update_tooltip()
+        # Invalidate cache để cập nhật hiển thị
+        self.setCacheMode(QGraphicsItem.CacheMode.NoCache)
+        self.update()
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
 
 class HazardZoneItem(QGraphicsEllipseItem):
@@ -410,15 +425,17 @@ class RouteItem(QGraphicsPathItem):
             self._cumulative_lengths.append(self._total_length)
 
     def _update_style(self):
-        """Cập nhật kiểu dáng dựa trên flow và risk."""
+        """Cập nhật kiểu dáng dựa trên flow.
+
+        Sử dụng màu xám thống nhất cho tất cả tuyến đường để đơn giản hóa
+        hiển thị. Độ rộng đường tỷ lệ với lưu lượng.
+        """
+        # Độ rộng tỷ lệ với flow (3-12 pixels)
         width = max(3, min(12, 3 + self.flow * 0.0005))
 
-        if self.risk > 0.7:
-            color = hex_to_qcolor(COLORS.danger, 220)
-        elif self.risk > 0.4:
-            color = hex_to_qcolor(COLORS.warning, 220)
-        else:
-            color = hex_to_qcolor(COLORS.success, 220)
+        # Màu xám thống nhất cho tất cả tuyến đường
+        # Opacity cao hơn một chút để dễ nhìn
+        color = hex_to_qcolor(COLORS.text_muted, 180)
 
         self.setPen(QPen(color, width, Qt.PenStyle.SolidLine,
                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
@@ -465,7 +482,14 @@ class RouteItem(QGraphicsPathItem):
 
 
 class EvacueeParticle(QGraphicsEllipseItem):
-    """Hạt đại diện cho nhóm người sơ tán đang di chuyển."""
+    """Hạt đại diện cho nhóm người sơ tán đang di chuyển.
+
+    Kích thước hạt tỷ lệ với số người đại diện:
+    - Nhỏ (6px): < 1,000 người
+    - Trung bình (10px): 1,000 - 10,000 người
+    - Lớn (14px): 10,000 - 50,000 người
+    - Rất lớn (18px): > 50,000 người
+    """
 
     # Cache colors để tránh tạo mới mỗi frame
     _color_cyan: Optional[QColor] = None
@@ -478,10 +502,18 @@ class EvacueeParticle(QGraphicsEllipseItem):
     COLOR_WARNING = 1
     COLOR_SUCCESS = 2
 
+    # Kích thước theo số người
+    SIZE_SMALL = 6
+    SIZE_MEDIUM = 10
+    SIZE_LARGE = 14
+    SIZE_XLARGE = 18
+
     def __init__(self, size: float = 6):
         super().__init__(-size/2, -size/2, size, size)
         self.setZValue(20)
         self._current_color_state = -1  # Không có màu
+        self._base_size = size
+        self._group_count = 0  # Số người đại diện
 
         # Cache colors một lần (class-level)
         if EvacueeParticle._color_cyan is None:
@@ -493,6 +525,27 @@ class EvacueeParticle(QGraphicsEllipseItem):
         self.setBrush(QBrush(EvacueeParticle._color_cyan))
         self.setPen(EvacueeParticle._pen_color)
         self._current_color_state = self.COLOR_CYAN
+
+    def set_size_for_flow(self, count: int):
+        """Đặt kích thước hạt dựa trên số người đại diện."""
+        self._group_count = count
+
+        # Xác định kích thước dựa trên số người
+        if count >= 50000:
+            new_size = self.SIZE_XLARGE
+        elif count >= 10000:
+            new_size = self.SIZE_LARGE
+        elif count >= 1000:
+            new_size = self.SIZE_MEDIUM
+        else:
+            new_size = self.SIZE_SMALL
+
+        if new_size != self._base_size:
+            self._base_size = new_size
+            self.setRect(-new_size/2, -new_size/2, new_size, new_size)
+
+        # Thêm tooltip hiển thị số người
+        self.setToolTip(f"~{count:,} người đang di chuyển")
 
     def set_color_state(self, state: int):
         """Cập nhật màu của hạt theo state - skip nếu không đổi."""
@@ -511,6 +564,13 @@ class EvacueeParticle(QGraphicsEllipseItem):
         """Reset particle để tái sử dụng từ pool."""
         self._current_color_state = self.COLOR_CYAN
         self.setBrush(QBrush(EvacueeParticle._color_cyan))
+        self._group_count = 0
+        # Reset về kích thước mặc định
+        if self._base_size != self.SIZE_SMALL:
+            self._base_size = self.SIZE_SMALL
+            self.setRect(-self.SIZE_SMALL/2, -self.SIZE_SMALL/2,
+                        self.SIZE_SMALL, self.SIZE_SMALL)
+        self.setToolTip("")
         self.setVisible(True)
 
 
@@ -742,39 +802,41 @@ class MapCanvas(QGraphicsView):
                 residential_path.lineTo(p2)
 
         # Vẽ từ dưới lên (đường nhỏ trước, đường lớn sau)
+        # Sử dụng màu xám thống nhất cho tất cả loại đường để đơn giản hóa hiển thị
+        # Chỉ khác nhau về độ rộng và opacity
+
         # Đường dân cư (nếu show_all)
         if not residential_path.isEmpty():
             item = QGraphicsPathItem(residential_path)
-            # Tăng opacity để dễ thấy hơn
-            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 80), 0.5))
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 40), 0.5))
             item.setZValue(0.9)
             self._scene.addItem(item)
             self._edge_items.append(item)
 
         if not tertiary_path.isEmpty():
             item = QGraphicsPathItem(tertiary_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 60), 0.5))
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 50), 0.5))
             item.setZValue(1)
             self._scene.addItem(item)
             self._edge_items.append(item)
 
         if not secondary_path.isEmpty():
             item = QGraphicsPathItem(secondary_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 80), 1))
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 60), 1))
             item.setZValue(1.1)
             self._scene.addItem(item)
             self._edge_items.append(item)
 
         if not primary_path.isEmpty():
             item = QGraphicsPathItem(primary_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.primary, 100), 1.5))
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 80), 1.5))
             item.setZValue(1.2)
             self._scene.addItem(item)
             self._edge_items.append(item)
 
         if not motorway_path.isEmpty():
             item = QGraphicsPathItem(motorway_path)
-            item.setPen(QPen(hex_to_qcolor(COLORS.warning, 120), 2))
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 100), 2))
             item.setZValue(1.3)
             self._scene.addItem(item)
             self._edge_items.append(item)
@@ -870,9 +932,18 @@ class MapCanvas(QGraphicsView):
         self._particle_pool.append(particle)
 
     def _add_route_particles(self, route_id: str, route_item: RouteItem, flow: int):
-        """Add animated particles along a route - sử dụng particle pooling."""
-        # Add 3-5 particles per route based on flow
+        """Add animated particles along a route - sử dụng particle pooling.
+
+        Particle size scales with flow:
+        - Large flows (>50K) get bigger particles
+        - Small flows (<1K) get smaller particles
+        - Number of particles also scales with flow
+        """
+        # Số particles tỷ lệ với flow (2-5 particles)
         num_particles = min(5, max(2, flow // 2000))
+
+        # Số người mỗi particle đại diện
+        people_per_particle = flow // num_particles if num_particles > 0 else flow
 
         for i in range(num_particles):
             # Sử dụng particle từ pool thay vì tạo mới
@@ -881,12 +952,15 @@ class MapCanvas(QGraphicsView):
                 self._scene.addItem(particle)
             self._particles.append(particle)
 
+            # Set kích thước particle dựa trên số người đại diện
+            particle.set_size_for_flow(people_per_particle)
+
             # Start at different positions along the route
             initial_progress = i / num_particles
 
             self._active_groups.append({
                 'route_id': route_id,
-                'count': flow // num_particles,
+                'count': people_per_particle,
                 'progress': initial_progress,
                 'particle': particle,
                 'route_item': route_item,

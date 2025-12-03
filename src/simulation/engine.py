@@ -63,6 +63,11 @@ class SimulationMetrics:
     shelter_utilization: Dict[str, float] = field(default_factory=dict)
     shelter_arrivals: Dict[str, int] = field(default_factory=dict)
 
+    # Tỷ lệ sức chứa
+    total_shelter_capacity: int = 0  # Tổng sức chứa của tất cả nơi trú ẩn
+    total_population: int = 0  # Tổng dân số cần sơ tán
+    remaining_shelter_capacity: int = 0  # Sức chứa còn lại
+
     # Chỉ số tuyến đường
     average_travel_time: float = 0.0
     average_risk_exposure: float = 0.0
@@ -88,7 +93,10 @@ class SimulationMetrics:
             'average_travel_time': self.average_travel_time,
             'average_risk_exposure': self.average_risk_exposure,
             'shelter_utilization': self.shelter_utilization,
-            'shelter_arrivals': self.shelter_arrivals
+            'shelter_arrivals': self.shelter_arrivals,
+            'total_shelter_capacity': self.total_shelter_capacity,
+            'total_population': self.total_population,
+            'remaining_shelter_capacity': self.remaining_shelter_capacity
         }
 
 
@@ -218,14 +226,21 @@ class SimulationEngine:
                 estimated_arrival=route.estimated_time_hours
             )
 
+        # Tính tổng sức chứa nơi trú ẩn
+        shelters = list(self.network.get_shelters())
+        total_capacity = sum(s.capacity for s in shelters)
+
         # Khởi tạo chỉ số
         self._metrics = SimulationMetrics(
             total_remaining=self._initial_population,
-            active_routes=len(self._route_states)
+            active_routes=len(self._route_states),
+            total_shelter_capacity=total_capacity,
+            total_population=self._initial_population,
+            remaining_shelter_capacity=total_capacity
         )
 
         # Khởi tạo theo dõi mức sử dụng nơi trú ẩn
-        for shelter in self.network.get_shelters():
+        for shelter in shelters:
             self._metrics.shelter_utilization[shelter.id] = 0.0
             self._metrics.shelter_arrivals[shelter.id] = 0
 
@@ -435,6 +450,12 @@ class SimulationEngine:
                         self._metrics.shelter_arrivals.get(shelter.id, 0) + admitted
                     self._metrics.shelter_utilization[shelter.id] = shelter.occupancy_rate
 
+        # Cập nhật sức chứa còn lại
+        total_arrivals = sum(self._metrics.shelter_arrivals.values())
+        self._metrics.remaining_shelter_capacity = max(
+            0, self._metrics.total_shelter_capacity - total_arrivals
+        )
+
     def _add_flow_to_path(self, path: List[str], count: int) -> None:
         """Thêm dòng chảy cho tất cả các cạnh trong một đường dẫn."""
         for i in range(len(path) - 1):
@@ -518,12 +539,44 @@ class SimulationEngine:
             self._metrics.evacuation_progress = total_evacuated / self._initial_population
 
         # Ước tính thời gian hoàn thành
-        if total_evacuated > 0 and self._current_time > 0:
-            rate = total_evacuated / self._current_time
-            remaining = self._initial_population - total_evacuated
-            if rate > 0:
+        # Tính dựa trên người đã khởi hành (không chỉ đã đến) để có ước tính chính xác hơn
+        total_departed = sum(state.departed for state in self._route_states.values())
+
+        if total_departed > 0 and self._current_time > 0:
+            # Tính tốc độ khởi hành (người/giờ)
+            departure_rate = total_departed / self._current_time
+
+            # Tính thời gian di chuyển trung bình của các tuyến đang hoạt động
+            avg_travel_time = 0.0
+            active_count = 0
+            for state in self._route_states.values():
+                if not state.is_complete and not state.blocked:
+                    avg_travel_time += state.route.estimated_time_hours
+                    active_count += 1
+            if active_count > 0:
+                avg_travel_time /= active_count
+            else:
+                avg_travel_time = self._metrics.average_travel_time if self._metrics.average_travel_time > 0 else 0.5
+
+            # Số người còn lại cần khởi hành
+            remaining_to_depart = self._initial_population - total_departed
+
+            if departure_rate > 0:
+                # Thời gian để tất cả khởi hành + thời gian di chuyển trung bình
+                time_to_complete_departures = remaining_to_depart / departure_rate
                 self._metrics.estimated_completion_hours = \
-                    self._current_time + (remaining / rate)
+                    self._current_time + time_to_complete_departures + avg_travel_time
+            else:
+                self._metrics.estimated_completion_hours = self._current_time + avg_travel_time
+        elif self._current_time == 0:
+            # Ước tính ban đầu dựa trên thời gian di chuyển trung bình của kế hoạch
+            avg_time = 0.0
+            count = 0
+            for state in self._route_states.values():
+                avg_time += state.route.estimated_time_hours
+                count += 1
+            if count > 0:
+                self._metrics.estimated_completion_hours = (avg_time / count) * 2  # x2 for buffer
 
         # Ghi điểm lịch sử
         self._metrics.evacuation_history.append(

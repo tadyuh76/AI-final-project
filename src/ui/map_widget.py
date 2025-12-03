@@ -556,6 +556,7 @@ class MapCanvas(QGraphicsView):
         self._hazard_items: Dict[int, HazardZoneItem] = {}
         self._district_items: Dict[str, DistrictBorderItem] = {}
         self._route_items: Dict[str, RouteItem] = {}
+        self._edge_items: List[QGraphicsPathItem] = []  # Lưu edge items để có thể xóa/vẽ lại
         self._particles: List[EvacueeParticle] = []
         self._particle_pool: List[EvacueeParticle] = []
 
@@ -629,6 +630,7 @@ class MapCanvas(QGraphicsView):
         self._hazard_items.clear()
         self._district_items.clear()
         self._route_items.clear()
+        self._edge_items.clear()
         self._particles.clear()
 
     def _lat_lon_to_pixel(self, lat: float, lon: float) -> QPointF:
@@ -675,17 +677,19 @@ class MapCanvas(QGraphicsView):
             self._scene.addItem(item)
             self._district_items[district_id] = item
 
-    def _draw_edges(self):
-        """Vẽ các đường trong mạng lưới - chỉ vẽ đường chính để tối ưu hiệu suất.
+    def _draw_edges(self, show_all: bool = False):
+        """Vẽ các đường trong mạng lưới.
 
-        Với 195k+ edges, vẽ tất cả sẽ rất chậm. Chỉ vẽ:
+        Args:
+            show_all: Nếu True, vẽ tất cả 195k+ đường (chậm).
+                      Nếu False, chỉ vẽ đường chính (nhanh).
+
+        Với 195k+ edges, vẽ tất cả sẽ rất chậm. Mặc định chỉ vẽ:
         - Đường cao tốc (motorway)
         - Đường trục (trunk)
         - Đường cấp một (primary)
         - Đường cấp hai (secondary)
         - Đường cấp ba (tertiary)
-
-        Bỏ qua đường dân cư và đường không phân loại.
         """
         if not self._network:
             return
@@ -704,11 +708,11 @@ class MapCanvas(QGraphicsView):
         primary_path = QPainterPath()
         secondary_path = QPainterPath()
         tertiary_path = QPainterPath()
+        residential_path = QPainterPath()
 
-        edges_drawn = 0
         for edge in self._network.get_edges():
-            # Bỏ qua đường dân cư và đường không phân loại
-            if edge.road_type not in MAJOR_ROAD_TYPES:
+            # Bỏ qua đường dân cư và đường không phân loại nếu không show_all
+            if not show_all and edge.road_type not in MAJOR_ROAD_TYPES:
                 continue
 
             source = self._network.get_node(edge.source_id)
@@ -730,36 +734,60 @@ class MapCanvas(QGraphicsView):
             elif edge.road_type == RoadType.SECONDARY:
                 secondary_path.moveTo(p1)
                 secondary_path.lineTo(p2)
-            else:  # TERTIARY
+            elif edge.road_type == RoadType.TERTIARY:
                 tertiary_path.moveTo(p1)
                 tertiary_path.lineTo(p2)
-
-            edges_drawn += 1
+            else:  # RESIDENTIAL, UNCLASSIFIED
+                residential_path.moveTo(p1)
+                residential_path.lineTo(p2)
 
         # Vẽ từ dưới lên (đường nhỏ trước, đường lớn sau)
+        # Đường dân cư (nếu show_all)
+        if not residential_path.isEmpty():
+            item = QGraphicsPathItem(residential_path)
+            # Tăng opacity để dễ thấy hơn
+            item.setPen(QPen(hex_to_qcolor(COLORS.text_muted, 80), 0.5))
+            item.setZValue(0.9)
+            self._scene.addItem(item)
+            self._edge_items.append(item)
+
         if not tertiary_path.isEmpty():
             item = QGraphicsPathItem(tertiary_path)
             item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 60), 0.5))
             item.setZValue(1)
             self._scene.addItem(item)
+            self._edge_items.append(item)
 
         if not secondary_path.isEmpty():
             item = QGraphicsPathItem(secondary_path)
             item.setPen(QPen(hex_to_qcolor(COLORS.surface_hover, 80), 1))
             item.setZValue(1.1)
             self._scene.addItem(item)
+            self._edge_items.append(item)
 
         if not primary_path.isEmpty():
             item = QGraphicsPathItem(primary_path)
             item.setPen(QPen(hex_to_qcolor(COLORS.primary, 100), 1.5))
             item.setZValue(1.2)
             self._scene.addItem(item)
+            self._edge_items.append(item)
 
         if not motorway_path.isEmpty():
             item = QGraphicsPathItem(motorway_path)
             item.setPen(QPen(hex_to_qcolor(COLORS.warning, 120), 2))
             item.setZValue(1.3)
             self._scene.addItem(item)
+            self._edge_items.append(item)
+
+    def redraw_edges(self, show_all: bool = False):
+        """Vẽ lại các đường với tùy chọn hiển thị mới."""
+        # Xóa các edge items cũ
+        for item in self._edge_items:
+            self._scene.removeItem(item)
+        self._edge_items.clear()
+
+        # Vẽ lại
+        self._draw_edges(show_all)
 
     def _draw_hazards(self):
         """Vẽ các vùng nguy hiểm."""

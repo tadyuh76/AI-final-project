@@ -414,6 +414,13 @@ class ControlPanel(QWidget):
         self.show_hazards.setChecked(True)
         self.show_hazards.stateChanged.connect(self._on_config_changed)
         sim_layout.addWidget(self.show_hazards)
+        sim_layout.addSpacing(4)
+
+        self.show_all_roads = StyledCheckBox("Hiển thị tất cả đường")
+        self.show_all_roads.setChecked(False)  # Mặc định tắt để tối ưu hiệu suất
+        self.show_all_roads.setToolTip("Bật để hiển thị tất cả 195k+ đường (có thể chậm)")
+        self.show_all_roads.stateChanged.connect(self._on_config_changed)
+        sim_layout.addWidget(self.show_all_roads)
 
         layout.addWidget(sim_group)
 
@@ -523,6 +530,7 @@ class ControlPanel(QWidget):
             'show_particles': self.show_particles.isChecked(),
             'show_routes': self.show_routes.isChecked(),
             'show_hazards': self.show_hazards.isChecked(),
+            'show_all_roads': self.show_all_roads.isChecked(),
         }
 
     def _get_algorithm_type(self) -> str:

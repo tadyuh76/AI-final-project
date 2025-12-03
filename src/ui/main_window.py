@@ -506,6 +506,7 @@ class MainWindow(QMainWindow):
         show_particles = config.get('show_particles', True)
         show_routes = config.get('show_routes', True)
         show_hazards = config.get('show_hazards', True)
+        show_all_roads = config.get('show_all_roads', False)
 
         # Cập nhật particles visibility
         for particle in self.map_widget.canvas._particles:
@@ -518,6 +519,23 @@ class MainWindow(QMainWindow):
         # Cập nhật hazards visibility
         for hazard_item in self.map_widget.canvas._hazard_items.values():
             hazard_item.setVisible(show_hazards)
+
+        # Cập nhật hiển thị tất cả đường (cần vẽ lại)
+        # Chỉ vẽ lại nếu giá trị thay đổi
+        if not hasattr(self, '_last_show_all_roads'):
+            self._last_show_all_roads = False
+        if show_all_roads != self._last_show_all_roads:
+            self._last_show_all_roads = show_all_roads
+            # Hiển thị thông báo đang xử lý
+            if show_all_roads:
+                self.status_label.setText("Đang vẽ tất cả đường (195k+)...")
+            self.map_widget.canvas.redraw_edges(show_all_roads)
+            # Cập nhật scene để hiển thị thay đổi
+            self.map_widget.canvas.viewport().update()
+            if show_all_roads:
+                self.status_label.setText(f"Đã vẽ tất cả đường ({len(self.map_widget.canvas._edge_items)} layers)")
+            else:
+                self.status_label.setText("Chỉ hiển thị đường chính")
 
     @pyqtSlot(str, int, float)
     def _on_optimization_progress(self, algo: str, iteration: int, cost: float):

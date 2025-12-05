@@ -503,7 +503,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Chuyển đổi giải pháp tốt nhất thành kế hoạch sơ tán
         plan = self._convert_to_plan(self.alpha.position)
 
-        # Tính chi phí theo công thức chuẩn (để so sánh công bằng với GBFS và Hybrid)
+        # Tính chi phí theo công thức chuẩn (để so sánh công bằng với GBFS)
         standardized_cost = self._calculate_plan_cost(plan)
 
         # Hoàn thiện các chỉ số

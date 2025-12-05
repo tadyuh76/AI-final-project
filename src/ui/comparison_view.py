@@ -43,8 +43,7 @@ class ConvergenceChart(QWidget):
         self._data: Dict[str, List[float]] = {}
         self._colors = {
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
         self._setup_ui()
@@ -143,8 +142,7 @@ class MetricBarChart(QWidget):
         self._metric_name = "Chi phí"
         self._colors = {
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
         self._setup_ui()
@@ -193,7 +191,7 @@ class MetricBarChart(QWidget):
         self.plot_widget.clear()
         self.plot_widget.setTitle(f'So sánh {self._metric_name}')
 
-        algos = ['gbfs', 'gwo', 'hybrid']
+        algos = ['gbfs', 'gwo']
         y_positions = []
         widths = []
         colors = []
@@ -240,8 +238,8 @@ class PerformanceTable(QTableWidget):
         super().__init__(parent)
 
         # Thiết lập bảng
-        self.setColumnCount(4)
-        self.setHorizontalHeaderLabels(['Chỉ số', 'GBFS', 'GWO', 'Hybrid'])
+        self.setColumnCount(3)
+        self.setHorizontalHeaderLabels(['Chỉ số', 'GBFS', 'GWO'])
 
         # Các hàng
         metrics = [
@@ -266,7 +264,7 @@ class PerformanceTable(QTableWidget):
 
     def update_metrics(self, metrics: Dict[str, Dict[str, Any]]):
         """Cập nhật bảng với các chỉ số từ kết quả so sánh."""
-        algo_columns = {'gbfs': 1, 'gwo': 2, 'hybrid': 3}
+        algo_columns = {'gbfs': 1, 'gwo': 2}
         metric_rows = {
             'execution_time_seconds': 0,
             'final_cost': 1,
@@ -305,7 +303,7 @@ class PerformanceTable(QTableWidget):
 
     def highlight_winner(self, winner: str):
         """Đánh dấu cột thuật toán chiến thắng."""
-        algo_columns = {'gbfs': 1, 'gwo': 2, 'hybrid': 3}
+        algo_columns = {'gbfs': 1, 'gwo': 2}
         winner_col = algo_columns.get(winner)
 
         if winner_col is None:
@@ -334,8 +332,7 @@ class RadarChart(QWidget):
         self._labels = ['Tốc độ', 'An toàn', 'Bao phủ', 'Cân bằng', 'Hiệu quả']
         self._colors = {
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
     def set_data(self, algorithm: str, values: List[float]):

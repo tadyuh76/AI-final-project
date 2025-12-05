@@ -351,7 +351,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 shelter.current_occupancy += actual_flow
                 zone_remaining[zone.id] -= actual_flow
 
-                # Tính chi phí theo công thức chuẩn (giống GWO và Hybrid)
+                # Tính chi phí theo công thức chuẩn (giống GWO)
                 route_cost = actual_flow * (
                     route_time +
                     0.3 * route_risk +

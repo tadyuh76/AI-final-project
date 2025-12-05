@@ -13,7 +13,6 @@ class AlgorithmType(Enum):
     """Các loại thuật toán khả dụng."""
     GBFS = "gbfs"
     GWO = "gwo"
-    HYBRID = "hybrid"
 
 
 @dataclass
@@ -185,10 +184,6 @@ class AlgorithmConfig:
     max_iterations: int = 100
     a_initial: float = 2.0  # Tham số khám phá
 
-    # Tham số Hybrid
-    gwo_iterations: int = 50
-    refinement_iterations: int = 20
-
     # Chung
     min_flow_threshold: int = 20  # Lowered from 100 to avoid dropping small valid assignments
     min_zone_risk_for_evacuation: float = 0.1  # Zones with risk below this don't need evacuation
@@ -203,8 +198,6 @@ class AlgorithmConfig:
             'n_wolves': self.n_wolves,
             'max_iterations': self.max_iterations,
             'a_initial': self.a_initial,
-            'gwo_iterations': self.gwo_iterations,
-            'refinement_iterations': self.refinement_iterations,
             'min_flow_threshold': self.min_flow_threshold,
             'min_zone_risk_for_evacuation': self.min_zone_risk_for_evacuation
         }

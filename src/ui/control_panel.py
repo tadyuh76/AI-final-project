@@ -293,7 +293,6 @@ class ControlPanel(QWidget):
 
         self.algorithm_combo = QComboBox()
         self.algorithm_combo.addItems([
-            "GBFS + GWO (Lai ghép)",
             "GBFS (Tìm đường tham lam)",
             "GWO (Tối ưu bầy sói)"
         ])
@@ -594,11 +593,10 @@ class ControlPanel(QWidget):
     def _on_algorithm_changed(self, text: str):
         """Xử lý khi thuật toán thay đổi."""
         algo_map = {
-            "GBFS + GWO (Lai ghép)": "hybrid",
             "GBFS (Tìm đường tham lam)": "gbfs",
             "GWO (Tối ưu bầy sói)": "gwo"
         }
-        self.algorithm_changed.emit(algo_map.get(text, "hybrid"))
+        self.algorithm_changed.emit(algo_map.get(text, "gbfs"))
 
     def _on_pause_clicked(self):
         """Xử lý nút pause/resume."""
@@ -694,11 +692,10 @@ class ControlPanel(QWidget):
         """Lấy loại thuật toán được chọn."""
         text = self.algorithm_combo.currentText()
         algo_map = {
-            "GBFS + GWO (Lai ghép)": "hybrid",
             "GBFS (Tìm đường tham lam)": "gbfs",
             "GWO (Tối ưu bầy sói)": "gwo"
         }
-        return algo_map.get(text, "hybrid")
+        return algo_map.get(text, "gbfs")
 
     def set_running_state(self, running: bool):
         """Cập nhật UI khi đang chạy/dừng."""

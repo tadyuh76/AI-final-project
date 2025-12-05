@@ -79,8 +79,15 @@ class GreyWolfOptimizer(BaseAlgorithm):
     def algorithm_type(self) -> AlgorithmType:
         return AlgorithmType.GWO
 
-    def _initialize_problem(self) -> None:
-        """Khởi tạo các chiều của bài toán và tính trước các ma trận."""
+    def _initialize_problem(self, use_actual_paths: bool = False) -> None:
+        """
+        Khởi tạo các chiều của bài toán và tính trước các ma trận.
+
+        Args:
+            use_actual_paths: Nếu True, tính toán khoảng cách và rủi ro thực tế
+                              qua mạng lưới đường (chậm hơn nhưng chính xác hơn).
+                              Nếu False, sử dụng khoảng cách đường chim bay.
+        """
         all_zones = self.network.get_population_zones()
         self.shelters = self.network.get_shelters()
 
@@ -103,19 +110,30 @@ class GreyWolfOptimizer(BaseAlgorithm):
         self.n_zones = len(self.zones)
         self.n_shelters = len(self.shelters)
 
-        # Tính trước ma trận khoảng cách
+        # Khởi tạo ma trận
         self._distance_matrix = np.zeros((self.n_zones, self.n_shelters))
+        self._risk_matrix = np.zeros((self.n_zones, self.n_shelters))
+        self._time_matrix = np.zeros((self.n_zones, self.n_shelters))
+        self._path_cache = {}  # Cache đường đi đã tính: (zone_idx, shelter_idx) -> path
+
+        if use_actual_paths:
+            self._compute_actual_path_costs()
+        else:
+            self._compute_bird_eye_costs()
+
+    def _compute_bird_eye_costs(self) -> None:
+        """Tính chi phí theo đường chim bay (nhanh nhưng kém chính xác)."""
         for i, zone in enumerate(self.zones):
             for j, shelter in enumerate(self.shelters):
+                # Khoảng cách đường chim bay
                 self._distance_matrix[i, j] = haversine_distance(
                     zone.lat, zone.lon, shelter.lat, shelter.lon
                 )
 
-        # Tính trước ma trận rủi ro (kiểm tra nhiều điểm dọc theo đường đi)
-        self._risk_matrix = np.zeros((self.n_zones, self.n_shelters))
-        for i, zone in enumerate(self.zones):
-            for j, shelter in enumerate(self.shelters):
-                # Check risk at multiple points along the route
+                # Thời gian ước tính (giả sử 30 km/h)
+                self._time_matrix[i, j] = self._distance_matrix[i, j] / 30.0
+
+                # Rủi ro: kiểm tra nhiều điểm dọc theo đường thẳng
                 max_risk = 0.0
                 for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
                     lat = zone.lat + t * (shelter.lat - zone.lat)
@@ -123,11 +141,151 @@ class GreyWolfOptimizer(BaseAlgorithm):
                     risk = self.network.get_total_risk_at(lat, lon)
                     max_risk = max(max_risk, risk)
 
-                # Also check if shelter is in hazard zone
+                # Kiểm tra rủi ro tại shelter
                 shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
                 max_risk = max(max_risk, shelter_risk)
 
                 self._risk_matrix[i, j] = max_risk
+
+    def _compute_actual_path_costs(self) -> None:
+        """
+        Tính chi phí thực tế bằng cách tìm đường qua mạng lưới.
+        Chậm hơn nhưng chính xác hơn nhiều cho Hybrid algorithm.
+        """
+        import heapq
+
+        total_pairs = self.n_zones * self.n_shelters
+        computed = 0
+
+        for i, zone in enumerate(self.zones):
+            for j, shelter in enumerate(self.shelters):
+                # Tìm đường đi thực tế và tính các metrics
+                path, distance, time_hours, max_risk = self._find_path_with_metrics(zone, shelter)
+
+                self._distance_matrix[i, j] = distance
+                self._time_matrix[i, j] = time_hours
+                self._risk_matrix[i, j] = max_risk
+                self._path_cache[(i, j)] = path
+
+                computed += 1
+
+                # Báo cáo tiến trình mỗi 10%
+                if computed % max(1, total_pairs // 10) == 0:
+                    progress = computed / total_pairs * 100
+                    self.report_progress(0, 0, {
+                        'phase': 'precompute',
+                        'progress': f'{progress:.0f}%',
+                        'computed': computed,
+                        'total': total_pairs
+                    })
+
+    def _find_path_with_metrics(self, zone: PopulationZone, shelter: Shelter) -> tuple:
+        """
+        Tìm đường đi và tính toán các metrics thực tế.
+
+        Returns:
+            Tuple của (path, distance_km, time_hours, max_risk)
+        """
+        import heapq
+
+        # Lấy node zone và shelter từ mạng
+        zone_in_network = self.network.get_node(zone.id)
+        zone_node = zone_in_network if zone_in_network else self.network.find_nearest_node(zone.lat, zone.lon)
+
+        shelter_in_network = self.network.get_node(shelter.id)
+        shelter_nearest = self.network.find_nearest_node(shelter.lat, shelter.lon)
+
+        if not zone_node:
+            # Fallback: trả về đường chim bay
+            dist = haversine_distance(zone.lat, zone.lon, shelter.lat, shelter.lon)
+            return [zone.id, shelter.id], dist, dist / 30.0, 0.5
+
+        target_node = shelter_in_network if shelter_in_network else shelter_nearest
+        if not target_node:
+            dist = haversine_distance(zone.lat, zone.lon, shelter.lat, shelter.lon)
+            return [zone.id, shelter.id], dist, dist / 30.0, 0.5
+
+        # A* search để tìm đường
+        counter = 0
+        start_h = haversine_distance(zone_node.lat, zone_node.lon, target_node.lat, target_node.lon)
+
+        if zone_in_network:
+            open_set = [(start_h, counter, zone_node.id, [zone_node.id], 0.0, 0.0, 0.0)]
+        else:
+            open_set = [(start_h, counter, zone_node.id, [zone.id, zone_node.id], 0.0, 0.0, 0.0)]
+
+        visited = set()
+        g_costs = {zone_node.id: 0.0}
+
+        # open_set items: (f_cost, counter, node_id, path, total_distance, total_time, max_risk)
+
+        while open_set:
+            f_cost, _, current_id, path, total_dist, total_time, max_risk = heapq.heappop(open_set)
+
+            if current_id in visited:
+                continue
+            visited.add(current_id)
+
+            # Cập nhật max_risk tại node hiện tại
+            current_node = self.network.get_node(current_id)
+            if current_node:
+                node_risk = self.network.get_total_risk_at(current_node.lat, current_node.lon)
+                max_risk = max(max_risk, node_risk)
+
+            # Kiểm tra đã đến shelter
+            if current_id == shelter.id:
+                return path, total_dist, total_time, max_risk
+
+            # Kiểm tra đã đến node gần shelter
+            if shelter_nearest and current_id == shelter_nearest.id:
+                edge_to_shelter = self.network.get_edge_between(current_id, shelter.id)
+                if edge_to_shelter and not edge_to_shelter.is_blocked:
+                    final_path = path + [shelter.id]
+                    final_dist = total_dist + edge_to_shelter.length_km
+                    final_time = total_time + edge_to_shelter.current_travel_time
+                    shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
+                    final_risk = max(max_risk, edge_to_shelter.flood_risk, shelter_risk)
+                    return final_path, final_dist, final_time, final_risk
+
+            # Mở rộng neighbors
+            for neighbor_id in self.network.get_neighbors(current_id):
+                if neighbor_id in visited:
+                    continue
+
+                edge = self.network.get_edge_between(current_id, neighbor_id)
+                if not edge or edge.is_blocked:
+                    continue
+
+                # Tính chi phí edge (có penalty cho high risk)
+                edge_cost = edge.length_km
+                if edge.flood_risk > 0.6:
+                    edge_cost *= 100  # Heavy penalty nhưng vẫn có thể đi qua
+                elif edge.flood_risk > 0.3:
+                    edge_cost *= (1 + edge.flood_risk * 10)
+
+                new_g = g_costs[current_id] + edge_cost
+
+                if neighbor_id not in g_costs or new_g < g_costs[neighbor_id]:
+                    g_costs[neighbor_id] = new_g
+                    neighbor_node = self.network.get_node(neighbor_id)
+                    if neighbor_node:
+                        h = haversine_distance(neighbor_node.lat, neighbor_node.lon,
+                                              target_node.lat, target_node.lon)
+                        f = new_g + h
+                        counter += 1
+
+                        new_dist = total_dist + edge.length_km
+                        new_time = total_time + edge.current_travel_time
+                        new_risk = max(max_risk, edge.flood_risk)
+
+                        heapq.heappush(open_set, (
+                            f, counter, neighbor_id, path + [neighbor_id],
+                            new_dist, new_time, new_risk
+                        ))
+
+        # Không tìm thấy đường - trả về đường chim bay với penalty cao
+        dist = haversine_distance(zone.lat, zone.lon, shelter.lat, shelter.lon)
+        return [zone.id, shelter.id], dist * 2, dist / 15.0, 0.9  # Penalty cho unreachable
 
     def _initialize_population(self) -> None:
         """Khởi tạo quần thể sói với các giải pháp ngẫu nhiên."""
@@ -182,10 +340,9 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Tính toán luồng thực tế
         flows = position * effective_populations[:, np.newaxis]
 
-        # 1. Chi phí thời gian (luồng * khoảng cách / tốc độ) - chuẩn hóa
-        # Giả sử tốc độ trung bình là 30 km/h
-        avg_speed = 30.0
-        time_cost = np.sum(flows * self._distance_matrix / avg_speed) / 1000.0  # Chuẩn hóa
+        # 1. Chi phí thời gian - sử dụng thời gian thực từ _time_matrix
+        # _time_matrix chứa thời gian thực tế nếu use_actual_paths=True
+        time_cost = np.sum(flows * self._time_matrix) / 1000.0  # Chuẩn hóa
 
         # 2. Chi phí rủi ro - HEAVILY penalize routes through hazard zones
         # Block routes where risk > 0.6 by adding massive penalty (standardized threshold)
@@ -262,9 +419,13 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Tính lại fitness
         wolf.fitness = self._calculate_fitness(wolf.position)
 
-    def optimize(self, **kwargs) -> Tuple[EvacuationPlan, AlgorithmMetrics]:
+    def optimize(self, use_actual_paths: bool = False, **kwargs) -> Tuple[EvacuationPlan, AlgorithmMetrics]:
         """
         Chạy tối ưu hóa GWO.
+
+        Args:
+            use_actual_paths: Nếu True, tính toán khoảng cách thực tế qua mạng lưới.
+                              Chậm hơn nhưng chính xác hơn cho Hybrid algorithm.
 
         Returns:
             Tuple của (EvacuationPlan, AlgorithmMetrics)
@@ -272,7 +433,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
         start_time = self._start_timer()
 
         # Khởi tạo bài toán
-        self._initialize_problem()
+        self._initialize_problem(use_actual_paths=use_actual_paths)
 
         if self.n_zones == 0 or self.n_shelters == 0:
             self._stop_timer(start_time)
@@ -395,11 +556,14 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 if actual_flow < self.config.min_flow_threshold:
                     continue
 
-                # Build path using network graph
-                path = self._find_path(zone, shelter)
+                # Use cached path if available, otherwise compute
+                if (i, j) in self._path_cache:
+                    path = self._path_cache[(i, j)]
+                else:
+                    path = self._find_path(zone, shelter)
 
                 distance = self._distance_matrix[i, j]
-                time_hours = distance / 30.0
+                time_hours = self._time_matrix[i, j]
                 risk = self._risk_matrix[i, j]
 
                 route = EvacuationRoute(
@@ -460,7 +624,11 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 actual_flow = min(zone_remaining[i], int(available))
 
                 if actual_flow > 0:
-                    path = self._find_path(zone, best_shelter)
+                    # Use cached path if available
+                    if (i, best_j) in self._path_cache:
+                        path = self._path_cache[(i, best_j)]
+                    else:
+                        path = self._find_path(zone, best_shelter)
                     risk = self._risk_matrix[i, best_j]
 
                     route = EvacuationRoute(
@@ -469,7 +637,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
                         path=path,
                         flow=actual_flow,
                         distance_km=best_dist,
-                        estimated_time_hours=best_dist / 30.0,
+                        estimated_time_hours=self._time_matrix[i, best_j],
                         risk_score=risk
                     )
                     plan.add_route(route)

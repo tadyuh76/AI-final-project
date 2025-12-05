@@ -11,9 +11,10 @@ import time
 
 class AlgorithmType(Enum):
     """Các loại thuật toán khả dụng."""
-    GBFS = "gbfs"
-    GWO = "gwo"
-    HYBRID = "hybrid"
+    ASTAR = "astar"  # A* - tối ưu với f(n) = g(n) + h(n)
+    GBFS = "gbfs"    # Greedy Best-First Search - chỉ h(n)
+    GWO = "gwo"      # Grey Wolf Optimizer
+    HYBRID = "hybrid"  # Hybrid GBFS + GWO
 
 
 @dataclass

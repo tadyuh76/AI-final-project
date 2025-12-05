@@ -1,7 +1,7 @@
 """
 Bộ so sánh thuật toán để đánh giá và so sánh các thuật toán sơ tán.
 
-Cung cấp so sánh song song của các thuật toán GBFS, GWO và Hybrid
+Cung cấp so sánh song song của các thuật toán A*, GBFS, GWO và Hybrid
 với các chỉ số chi tiết và dữ liệu trực quan hóa.
 """
 
@@ -14,6 +14,7 @@ from .base import (
     BaseAlgorithm, AlgorithmType, AlgorithmConfig,
     EvacuationPlan, AlgorithmMetrics, ProgressCallback
 )
+from .astar import AStarSearch
 from .gbfs import GreedyBestFirstSearch
 from .gwo import GreyWolfOptimizer
 from .hybrid import HybridGBFSGWO
@@ -102,12 +103,17 @@ class AlgorithmComparator:
 
     def compare_all(self) -> ComparisonResult:
         """
-        Chạy cả ba thuật toán và so sánh kết quả.
+        Chạy tất cả bốn thuật toán và so sánh kết quả.
 
         Returns:
             ComparisonResult với tất cả các chỉ số và xếp hạng
         """
-        return self.compare([AlgorithmType.GBFS, AlgorithmType.GWO, AlgorithmType.HYBRID])
+        return self.compare([
+            AlgorithmType.ASTAR,   # A* - baseline tối ưu
+            AlgorithmType.GBFS,    # Greedy Best-First Search
+            AlgorithmType.GWO,     # Grey Wolf Optimizer
+            AlgorithmType.HYBRID   # Hybrid GBFS + GWO
+        ])
 
     def compare(self, algorithms: List[AlgorithmType]) -> ComparisonResult:
         """
@@ -135,7 +141,11 @@ class AlgorithmComparator:
                     return cb
                 algorithm.set_progress_callback(make_callback(algo_type))
 
-            plan, metrics = algorithm.optimize()
+            # GWO cần use_actual_paths=True để tính khoảng cách thực qua mạng lưới
+            if algo_type == AlgorithmType.GWO:
+                plan, metrics = algorithm.optimize(use_actual_paths=True)
+            else:
+                plan, metrics = algorithm.optimize()
 
             result.plans[algo_type] = plan
             result.metrics[algo_type] = metrics
@@ -150,7 +160,9 @@ class AlgorithmComparator:
 
     def _create_algorithm(self, algo_type: AlgorithmType) -> BaseAlgorithm:
         """Tạo một thể hiện thuật toán của loại được chỉ định."""
-        if algo_type == AlgorithmType.GBFS:
+        if algo_type == AlgorithmType.ASTAR:
+            return AStarSearch(self.network, self.config)
+        elif algo_type == AlgorithmType.GBFS:
             return GreedyBestFirstSearch(self.network, self.config)
         elif algo_type == AlgorithmType.GWO:
             return GreyWolfOptimizer(self.network, self.config)
@@ -321,15 +333,15 @@ class AlgorithmComparator:
             Chuỗi bảng đã định dạng
         """
         lines = []
-        lines.append("=" * 70)
+        lines.append("=" * 90)
         lines.append("KẾT QUẢ SO SÁNH THUẬT TOÁN")
-        lines.append("=" * 70)
+        lines.append("=" * 90)
         lines.append("")
 
-        # Tiêu đề
-        header = f"{'Chỉ số':<25} | {'GBFS':>12} | {'GWO':>12} | {'Hybrid':>12}"
+        # Tiêu đề - bao gồm A*
+        header = f"{'Chỉ số':<25} | {'A*':>12} | {'GBFS':>12} | {'GWO':>12} | {'Hybrid':>12}"
         lines.append(header)
-        lines.append("-" * 70)
+        lines.append("-" * 90)
 
         # Các chỉ số
         metrics_display = [
@@ -342,9 +354,12 @@ class AlgorithmComparator:
             ('Số lần lặp', 'iterations', '{:d}')
         ]
 
+        # Thứ tự thuật toán: A*, GBFS, GWO, Hybrid
+        algo_order = [AlgorithmType.ASTAR, AlgorithmType.GBFS, AlgorithmType.GWO, AlgorithmType.HYBRID]
+
         for display_name, attr_name, fmt in metrics_display:
             values = []
-            for algo in [AlgorithmType.GBFS, AlgorithmType.GWO, AlgorithmType.HYBRID]:
+            for algo in algo_order:
                 m = result.metrics.get(algo)
                 if m:
                     val = getattr(m, attr_name, 0)
@@ -357,10 +372,10 @@ class AlgorithmComparator:
                 else:
                     values.append("N/A")
 
-            line = f"{display_name:<25} | {values[0]:>12} | {values[1]:>12} | {values[2]:>12}"
+            line = f"{display_name:<25} | {values[0]:>12} | {values[1]:>12} | {values[2]:>12} | {values[3]:>12}"
             lines.append(line)
 
-        lines.append("-" * 70)
+        lines.append("-" * 90)
 
         # Người chiến thắng
         if result.winner:
@@ -368,7 +383,7 @@ class AlgorithmComparator:
         else:
             lines.append("CHIẾN THẮNG: N/A")
 
-        lines.append("=" * 70)
+        lines.append("=" * 90)
 
         return "\n".join(lines)
 

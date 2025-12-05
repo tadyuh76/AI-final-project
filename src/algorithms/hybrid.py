@@ -2,12 +2,16 @@
 Thuật toán Hybrid GBFS + GWO cho tối ưu hóa sơ tán.
 
 Kết hợp điểm mạnh của cả hai thuật toán:
-- GWO: Tối ưu hóa toàn cục của phân phối luồng
+- GWO: Tối ưu hóa toàn cục của phân phối luồng với chi phí đường đi thực tế
 - GBFS: Tìm đường cục bộ với heuristic đa mục tiêu
 
 Phương pháp hai giai đoạn:
 1. Giai đoạn 1 (GWO): Tối ưu hóa việc các khu vực gửi người đến nơi trú ẩn nào
-2. Giai đoạn 2 (GBFS): Tìm đường đi thực tế cho mỗi phân công luồng
+   - SỬ DỤNG chi phí đường đi thực tế qua mạng lưới (không phải đường chim bay)
+   - Tính toán trước tất cả các đường đi và cache kết quả
+2. Giai đoạn 2 (GBFS): Tìm đường đi chi tiết cho mỗi phân công
+   - Sử dụng các đường đi đã được cache từ GWO khi có thể
+   - Áp dụng GBFS cho các trường hợp cần đường đi mới
 """
 
 from typing import List, Dict, Optional, Tuple, Any
@@ -110,8 +114,10 @@ class HybridGBFSGWO(BaseAlgorithm):
 
         self.gwo.set_progress_callback(gwo_progress)
 
-        # Chạy GWO
-        gwo_plan, gwo_metrics = self.gwo.optimize()
+        # Chạy GWO với chi phí đường đi thực tế
+        # use_actual_paths=True: GWO sẽ tính toán đường đi qua mạng lưới thay vì đường chim bay
+        # Điều này đảm bảo tối ưu hóa dựa trên khoảng cách và rủi ro thực tế
+        gwo_plan, gwo_metrics = self.gwo.optimize(use_actual_paths=True)
         flow_matrix = self.gwo.get_flow_matrix()
 
         if flow_matrix is None:
@@ -167,7 +173,8 @@ class HybridGBFSGWO(BaseAlgorithm):
                                  zones: List[PopulationZone],
                                  shelters: List[Shelter]) -> EvacuationPlan:
         """
-        Áp dụng tìm đường GBFS cho các phân công luồng GWO.
+        Áp dụng tìm đường cho các phân công luồng GWO.
+        Ưu tiên sử dụng đường đi đã được cache từ GWO, chỉ dùng GBFS khi cần.
 
         Args:
             flow_matrix: Phân phối luồng được tối ưu hóa bởi GWO [n_zones x n_shelters]
@@ -191,6 +198,12 @@ class HybridGBFSGWO(BaseAlgorithm):
         # Track which zones got routes and remaining population
         zones_with_routes = set()
         zone_remaining = {z.id: z.population for z in zones}
+
+        # Lấy cache đường đi từ GWO (nếu có)
+        path_cache = getattr(self.gwo, '_path_cache', {})
+        distance_matrix = getattr(self.gwo, '_distance_matrix', None)
+        time_matrix = getattr(self.gwo, '_time_matrix', None)
+        risk_matrix = getattr(self.gwo, '_risk_matrix', None)
 
         # Xử lý từng khu vực
         for i, zone in enumerate(zones):
@@ -219,15 +232,22 @@ class HybridGBFSGWO(BaseAlgorithm):
                 if actual_flow < self.config.min_flow_threshold:
                     continue
 
-                # Tìm đường đi sử dụng GBFS
-                path, found_shelter, cost = self.gbfs.find_path(zone, [shelter])
-
-                if path and found_shelter:
-                    # Tính toán các chỉ số tuyến đường
+                # Ưu tiên sử dụng đường đi đã cache từ GWO
+                if (i, j) in path_cache and distance_matrix is not None:
+                    path = path_cache[(i, j)]
+                    distance = distance_matrix[i, j]
+                    time_hours = time_matrix[i, j] if time_matrix is not None else distance / 30.0
+                    risk = risk_matrix[i, j] if risk_matrix is not None else 0.0
+                else:
+                    # Fallback: Tìm đường đi sử dụng GBFS
+                    path, found_shelter, cost = self.gbfs.find_path(zone, [shelter])
+                    if not path or not found_shelter:
+                        continue
                     distance = self.gbfs._calculate_path_distance(path)
                     time_hours = self.gbfs._calculate_path_time(path)
                     risk = self.gbfs._calculate_path_risk(path)
 
+                if path:
                     route = EvacuationRoute(
                         zone_id=zone.id,
                         shelter_id=shelter.id,

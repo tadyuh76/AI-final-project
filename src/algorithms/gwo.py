@@ -305,12 +305,22 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Chuyển đổi giải pháp tốt nhất thành kế hoạch sơ tán
         plan = self._convert_to_plan(self.alpha.position)
 
+        # Tính chi phí theo công thức chuẩn (để so sánh công bằng với GBFS và Hybrid)
+        standardized_cost = self._calculate_plan_cost(plan)
+
         # Hoàn thiện các chỉ số
         self._stop_timer(start_time)
         self._metrics.iterations = len(self._metrics.convergence_history)
-        self._metrics.final_cost = self.alpha.fitness
+        self._metrics.final_cost = standardized_cost  # Dùng chi phí chuẩn, không phải fitness
         self._metrics.routes_found = len(plan.routes)
         self._metrics.evacuees_covered = plan.total_evacuees
+
+        # Tính độ dài đường đi trung bình
+        if plan.routes:
+            total_path_length = sum(len(r.path) for r in plan.routes)
+            self._metrics.average_path_length = total_path_length / len(plan.routes)
+        else:
+            self._metrics.average_path_length = 0.0
 
         # Tỷ lệ bao phủ: số người được sơ tán / min(dân số cần sơ tán, tổng sức chứa)
         # self.zones already filtered to only include zones needing evacuation
@@ -565,3 +575,27 @@ class GreyWolfOptimizer(BaseAlgorithm):
         if self.alpha:
             return self.alpha.fitness
         return float('inf')
+
+    def _calculate_plan_cost(self, plan: EvacuationPlan) -> float:
+        """
+        Tính tổng chi phí của một kế hoạch theo công thức chuẩn.
+
+        Args:
+            plan: Kế hoạch sơ tán
+
+        Returns:
+            Giá trị tổng chi phí
+        """
+        if not plan.routes:
+            return float('inf')
+
+        total_cost = 0.0
+        for route in plan.routes:
+            # Công thức chuẩn: flow × (time + 0.3×risk + 0.001×distance)
+            route_cost = route.flow * (
+                route.estimated_time_hours +
+                0.3 * route.risk_score +
+                0.001 * route.distance_km
+            )
+            total_cost += route_cost
+        return total_cost

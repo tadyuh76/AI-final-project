@@ -88,7 +88,7 @@ class AlgorithmMetrics:
         """Chuyển đổi sang từ điển để tuần tự hóa."""
         return {
             'algorithm': self.algorithm_type.value,
-            'execution_time': self.execution_time_seconds,
+            'execution_time_seconds': self.execution_time_seconds,
             'iterations': self.iterations,
             'final_cost': self.final_cost,
             'routes_found': self.routes_found,

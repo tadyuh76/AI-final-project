@@ -102,8 +102,10 @@ class HybridGBFSGWO(BaseAlgorithm):
         self.gwo = GreyWolfOptimizer(self.network, gwo_config)
 
         # Thiết lập chuyển tiếp tiến trình
+        # Lưu ý: Không thêm fitness GWO vào convergence_history vì dùng thang đo khác
+        # Chỉ báo cáo tiến trình cho UI nhưng không lưu vào biểu đồ hội tụ
         def gwo_progress(iteration: int, cost: float, data: Any) -> None:
-            self._metrics.convergence_history.append(cost)
+            # Báo cáo tiến trình GWO (fitness) - chỉ cho UI
             self.report_progress(iteration, cost, {'phase': 'gwo', 'data': data})
 
         self.gwo.set_progress_callback(gwo_progress)
@@ -117,6 +119,7 @@ class HybridGBFSGWO(BaseAlgorithm):
             return gwo_plan, self._metrics
 
         # ============ Giai đoạn 2: Tìm đường GBFS ============
+        # Bắt đầu ghi nhận convergence từ đây với chi phí chuẩn
         self.report_progress(self.gwo_iterations, gwo_metrics.final_cost, {'phase': 'gbfs_start'})
 
         # Use filtered zones from GWO (already sorted by risk)

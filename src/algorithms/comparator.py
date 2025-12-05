@@ -71,12 +71,12 @@ class AlgorithmComparator:
 
     # Trọng số chỉ số cho tính điểm tổng thể (tổng là 1.0)
     METRIC_WEIGHTS = {
-        'execution_time': 0.15,     # Thấp hơn là tốt hơn
-        'final_cost': 0.25,         # Thấp hơn là tốt hơn
-        'coverage_rate': 0.25,      # Cao hơn là tốt hơn
-        'average_path_length': 0.10, # Thấp hơn là tốt hơn (hiệu quả)
-        'routes_found': 0.10,       # Cao hơn là tốt hơn
-        'evacuees_covered': 0.15    # Cao hơn là tốt hơn
+        'execution_time_seconds': 0.15,  # Thấp hơn là tốt hơn
+        'final_cost': 0.25,              # Thấp hơn là tốt hơn
+        'coverage_rate': 0.25,           # Cao hơn là tốt hơn
+        'average_path_length': 0.10,     # Thấp hơn là tốt hơn (hiệu quả)
+        'routes_found': 0.10,            # Cao hơn là tốt hơn
+        'evacuees_covered': 0.15         # Cao hơn là tốt hơn
     }
 
     def __init__(self, network: EvacuationNetwork, config: Optional[AlgorithmConfig] = None):
@@ -173,7 +173,7 @@ class AlgorithmComparator:
         rankings = {}
 
         # Các chỉ số mà thấp hơn là tốt hơn
-        lower_is_better = ['execution_time', 'final_cost', 'average_path_length']
+        lower_is_better = ['execution_time_seconds', 'final_cost', 'average_path_length']
 
         for metric_name in self.METRIC_WEIGHTS.keys():
             values = []
@@ -234,7 +234,7 @@ class AlgorithmComparator:
             Từ điển các chỉ số đã chuẩn hóa
         """
         normalized = {}
-        lower_is_better = ['execution_time', 'final_cost', 'average_path_length']
+        lower_is_better = ['execution_time_seconds', 'final_cost', 'average_path_length']
 
         for metric_name in self.METRIC_WEIGHTS.keys():
             values = {}

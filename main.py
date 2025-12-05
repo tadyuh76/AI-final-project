@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-SafeRoute HCM - Toi uu Hoa So tan Bao
+SafeRoute HCM - Tối ưu Hoá Sơ tán Bão
 =====================================
 
-Ung dung AI cho viec toi uu hoa tuyen duong so tan bao tai Thanh pho Ho Chi Minh
-su dung thuat toan Hybrid GBFS + Grey Wolf Optimizer (GWO) voi truc quan hoa
-thoi gian thuc.
+Ứng dụng AI cho việc tối ưu hoá tuyến đường sơ tán bão tại Thành phố Hồ Chí Minh
+sử dụng thuật toán Hybrid GBFS + Grey Wolf Optimizer (GWO) với trực quan hoá
+thời gian thực.
 
-Cach chay:
-    python main.py           # Chay giao dien do hoa
-    python main.py --cli     # Chay che do dong lenh (khong can PyQt6)
-    python main.py --test    # Chay kiem tra
+Cách chạy:
+    python main.py           # Chạy giao diện đồ hoạ
+    python main.py --cli     # Chạy chế độ dòng lệnh (không cần PyQt6)
+    python main.py --test    # Chạy kiểm tra
 
-Yeu cau:
+Yêu cầu:
     - Python 3.10+
-    - PyQt6 (cho giao dien do hoa)
-    - networkx, numpy, scipy (cho thuat toan)
-    - osmnx (tuy chon, cho du lieu OSM thuc)
-    - pyqtgraph (tuy chon, cho bieu do)
+    - PyQt6 (cho giao diện đồ hoạ)
+    - networkx, numpy, scipy (cho thuật toán)
+    - osmnx (tuỳ chọn, cho dữ liệu OSM thực)
+    - pyqtgraph (tuỳ chọn, cho biểu đồ)
 
-Tac gia: UEH AI Team
-Phien ban: 1.0.0
+Tác giả: tadyuh76, ayo-lole, PeanLutHuynh, Leon2285
+Phiên bản: 1.0.0
 """
 
 import sys
@@ -28,37 +28,42 @@ import argparse
 
 
 def run_gui():
-    """Chay ung dung voi giao dien do hoa PyQt6."""
+    """Chạy ứng dụng với giao diện đồ hoạ PyQt6."""
     try:
         from PyQt6.QtWidgets import QApplication
         from src.ui.main_window import MainWindow
         from src.ui.styles import MAIN_STYLESHEET
     except ImportError as e:
-        print(f"Loi: Khong the import PyQt6. Hay cai dat PyQt6:")
+        print(f"Lỗi: Không thể import PyQt6. Hãy cài đặt PyQt6:")
         print("  pip install PyQt6 PyQt6-3D")
-        print(f"\nChi tiet: {e}")
+        print(f"\nChi tiết: {e}")
         sys.exit(1)
 
-    # Tao ung dung
+    # Tạo ứng dụng
     app = QApplication(sys.argv)
     app.setApplicationName("SafeRoute HCM")
     app.setOrganizationName("UEH AI Team")
     app.setApplicationVersion("1.0.0")
 
-    # Ap dung stylesheet
+    # Áp dụng stylesheet
     app.setStyleSheet(MAIN_STYLESHEET)
 
-    # Tao va hien thi cua so chinh
+    # Tạo và hiển thị cửa sổ chính
     window = MainWindow()
     window.show()
 
-    # Chay vong lap su kien
+    # Chạy vòng lặp sự kiện
     sys.exit(app.exec())
 
 
 def run_cli():
-    """Chay che do dong lenh khong co GUI."""
-    print("SafeRoute HCM - Che do Dong Lenh")
+    """
+    Chạy chế độ dòng lệnh không có GUI.
+
+    Chế độ này cho phép chạy thuật toán sơ tán mà không cần giao diện đồ hoạ,
+    phù hợp cho việc kiểm tra hoặc chạy trên server.
+    """
+    print("SafeRoute HCM - Chế độ Dòng Lệnh")
     print("=" * 50)
 
     try:
@@ -66,27 +71,28 @@ def run_cli():
         from src.algorithms.comparator import run_comparison
         from src.algorithms.base import AlgorithmConfig
     except ImportError as e:
-        print(f"Loi import: {e}")
-        print("Hay cai dat cac dependencies: pip install -r requirements.txt")
+        print(f"Lỗi import: {e}")
+        print("Hãy cài đặt các dependencies: pip install -r requirements.txt")
         sys.exit(1)
 
-    # Tai mang luoi
-    print("\nDang tai mang luoi TP.HCM...")
+    # Tải mạng lưới giao thông TP.HCM từ dữ liệu OpenStreetMap
+    print("\nĐang tải mạng lưới TP.HCM...")
     loader = OSMDataLoader()
     network = loader.load_hcm_network(use_cache=True)
     loader.add_default_hazards(network, typhoon_intensity=0.7)
 
+    # Hiển thị thống kê mạng lưới đã tải
     stats = network.get_stats()
-    print(f"\nThong ke Mang luoi:")
-    print(f"  Nut: {stats.total_nodes}")
-    print(f"  Canh: {stats.total_edges}")
-    print(f"  Khu vuc dan cu: {stats.population_zones}")
-    print(f"  Noi tru an: {stats.shelters}")
-    print(f"  Tong dan so: {stats.total_population:,}")
-    print(f"  Tong suc chua: {stats.total_shelter_capacity:,}")
+    print(f"\nThống kê Mạng lưới:")
+    print(f"  Nút: {stats.total_nodes}")
+    print(f"  Cạnh: {stats.total_edges}")
+    print(f"  Khu vực dân cư: {stats.population_zones}")
+    print(f"  Nơi trú ẩn: {stats.shelters}")
+    print(f"  Tổng dân số: {stats.total_population:,}")
+    print(f"  Tổng sức chứa: {stats.total_shelter_capacity:,}")
 
-    # Chay so sanh thuat toan
-    print("\nDang chay so sanh thuat toan...")
+    # Chạy so sánh các thuật toán tối ưu hoá (GBFS, GWO, Hybrid)
+    print("\nĐang chạy so sánh thuật toán...")
     config = AlgorithmConfig(
         n_wolves=30,
         max_iterations=50
@@ -94,14 +100,20 @@ def run_cli():
 
     result = run_comparison(network, config, verbose=True)
 
-    print(f"\nKet qua:")
-    print(f"  Thuat toan chien thang: {result.winner.value if result.winner else 'N/A'}")
-    print(f"  Diem so: {result.winner_score:.3f}")
+    # Hiển thị kết quả so sánh
+    print(f"\nKết quả:")
+    print(f"  Thuật toán chiến thắng: {result.winner.value if result.winner else 'N/A'}")
+    print(f"  Điểm số: {result.winner_score:.3f}")
 
 
 def run_tests():
-    """Chay kiem tra."""
-    print("Dang chay kiem tra...")
+    """
+    Chạy kiểm tra đơn vị với pytest.
+
+    Thực thi tất cả các test trong thư mục tests/ để đảm bảo
+    các module hoạt động đúng như mong đợi.
+    """
+    print("Đang chạy kiểm tra...")
 
     import subprocess
     result = subprocess.run(
@@ -112,8 +124,13 @@ def run_tests():
 
 
 def check_dependencies():
-    """Kiem tra cac dependencies."""
-    print("Kiem tra Dependencies")
+    """
+    Kiểm tra các dependencies cần thiết.
+
+    Duyệt qua danh sách các thư viện bắt buộc và tuỳ chọn,
+    báo cáo trạng thái cài đặt của từng thư viện.
+    """
+    print("Kiểm tra Dependencies")
     print("=" * 50)
 
     dependencies = [
@@ -133,46 +150,54 @@ def check_dependencies():
             __import__(package)
             status = "OK"
         except ImportError:
-            status = "THIEU"
+            status = "THIẾU"
             all_ok = False
 
         print(f"  {name:15} [{status}]")
 
     print()
     if all_ok:
-        print("Tat ca dependencies da duoc cai dat!")
+        print("Tất cả dependencies đã được cài đặt!")
     else:
-        print("Mot so dependencies thieu. Chay:")
+        print("Một số dependencies thiếu. Chạy:")
         print("  pip install -r requirements.txt")
 
     return all_ok
 
 
 def main():
-    """Diem vao chinh cua ung dung."""
+    """
+    Điểm vào chính của ứng dụng.
+
+    Phân tích các tham số dòng lệnh và khởi chạy chế độ phù hợp:
+    - Mặc định: Giao diện đồ hoạ PyQt6
+    - --cli: Chế độ dòng lệnh
+    - --test: Chạy kiểm tra
+    - --check: Kiểm tra dependencies
+    """
     parser = argparse.ArgumentParser(
-        description="SafeRoute HCM - Toi uu Hoa So tan Bao",
+        description="SafeRoute HCM - Tối ưu Hoá Sơ tán Bão",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Vi du:
-  python main.py              # Chay giao dien do hoa
-  python main.py --cli        # Chay che do dong lenh
-  python main.py --test       # Chay kiem tra
-  python main.py --check      # Kiem tra dependencies
+Ví dụ:
+  python main.py              # Chạy giao diện đồ hoạ
+  python main.py --cli        # Chạy chế độ dòng lệnh
+  python main.py --test       # Chạy kiểm tra
+  python main.py --check      # Kiểm tra dependencies
         """
     )
 
     parser.add_argument(
         "--cli", action="store_true",
-        help="Chay che do dong lenh (khong can PyQt6)"
+        help="Chạy chế độ dòng lệnh (không cần PyQt6)"
     )
     parser.add_argument(
         "--test", action="store_true",
-        help="Chay kiem tra"
+        help="Chạy kiểm tra"
     )
     parser.add_argument(
         "--check", action="store_true",
-        help="Kiem tra dependencies"
+        help="Kiểm tra dependencies"
     )
 
     args = parser.parse_args()

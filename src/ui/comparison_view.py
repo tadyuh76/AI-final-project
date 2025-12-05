@@ -1,13 +1,13 @@
 """
 View so sánh thuật toán với biểu đồ và bảng hiệu suất.
-Hiển thị các thông tin quan trọng: biểu đồ hội tụ, radar, bảng hiệu suất.
+Hiển thị các thông tin quan trọng: biểu đồ hội tụ, radar, bảng hiệu suất, biểu đồ cột.
 """
 
 from typing import Optional, Dict, List, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QTableWidget, QTableWidgetItem,
-    QHeaderView, QSplitter
+    QHeaderView, QSplitter, QGridLayout
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush
@@ -38,7 +38,7 @@ class ConvergenceChart(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setMinimumHeight(250)
+        self.setMinimumHeight(200)
 
         self._data: Dict[str, List[float]] = {}
         self._colors = {
@@ -73,7 +73,6 @@ class ConvergenceChart(QWidget):
 
             # Các item biểu đồ
             self._plot_items: Dict[str, Any] = {}
-            self._annotation_items: List[Any] = []
 
             layout.addWidget(self.plot_widget)
         else:
@@ -85,6 +84,8 @@ class ConvergenceChart(QWidget):
 
     def set_data(self, algorithm: str, convergence_history: List[float]):
         """Thiết lập dữ liệu hội tụ cho một thuật toán."""
+        if not convergence_history:
+            return
         self._data[algorithm] = convergence_history
         self._update_plot()
 
@@ -94,18 +95,12 @@ class ConvergenceChart(QWidget):
         if HAS_PYQTGRAPH:
             self.plot_widget.clear()
             self._plot_items.clear()
-            self._annotation_items.clear()
             self.plot_widget.addLegend(offset=(60, 30))
 
     def _update_plot(self):
         """Cập nhật biểu đồ với dữ liệu hiện tại."""
         if not HAS_PYQTGRAPH:
             return
-
-        # Xóa các annotation cũ
-        for item in self._annotation_items:
-            self.plot_widget.removeItem(item)
-        self._annotation_items.clear()
 
         for algo, data in self._data.items():
             if not data:
@@ -115,26 +110,15 @@ class ConvergenceChart(QWidget):
             r, g, b = hex_to_rgb(color)
             pen = pg.mkPen(color=QColor(r, g, b), width=2)
 
+            x_data = list(range(len(data)))
+
             if algo in self._plot_items:
-                self._plot_items[algo].setData(range(len(data)), data)
+                self._plot_items[algo].setData(x_data, data)
             else:
                 self._plot_items[algo] = self.plot_widget.plot(
-                    range(len(data)), data,
+                    x_data, data,
                     pen=pen, name=algo.upper()
                 )
-
-            # Thêm marker tại điểm tốt nhất
-            if data:
-                min_idx = data.index(min(data))
-                min_val = data[min_idx]
-                scatter = pg.ScatterPlotItem(
-                    [min_idx], [min_val],
-                    pen=pg.mkPen(color=QColor(r, g, b), width=2),
-                    brush=QColor(r, g, b),
-                    size=10
-                )
-                self.plot_widget.addItem(scatter)
-                self._annotation_items.append(scatter)
 
     def add_point(self, algorithm: str, iteration: int, cost: float):
         """Thêm điểm dữ liệu mới (cho cập nhật thời gian thực)."""
@@ -142,6 +126,107 @@ class ConvergenceChart(QWidget):
             self._data[algorithm] = []
         self._data[algorithm].append(cost)
         self._update_plot()
+
+
+# =============================================================================
+# BIỂU ĐỒ CỘT SO SÁNH CHỈ SỐ
+# =============================================================================
+
+class MetricBarChart(QWidget):
+    """Biểu đồ cột ngang so sánh các chỉ số."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(180)
+
+        self._data: Dict[str, float] = {}
+        self._metric_name = "Chi phí"
+        self._colors = {
+            'gbfs': COLORS.success,
+            'gwo': COLORS.purple,
+            'hybrid': COLORS.cyan
+        }
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        if HAS_PYQTGRAPH:
+            pg.setConfigOptions(
+                background=hex_to_qcolor(COLORS.surface),
+                foreground=hex_to_qcolor(COLORS.text),
+                antialias=True
+            )
+
+            self.plot_widget = pg.PlotWidget()
+            self.plot_widget.setTitle('So sánh Chi phí')
+            self.plot_widget.showGrid(x=True, y=False, alpha=0.3)
+
+            # Ẩn trục Y vì ta sẽ dùng tên thuật toán
+            self.plot_widget.getAxis('left').setTicks([])
+
+            layout.addWidget(self.plot_widget)
+        else:
+            label = QLabel("Cài đặt pyqtgraph để xem biểu đồ")
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(label)
+
+    def set_data(self, metrics: Dict[str, float], metric_name: str = "Chi phí"):
+        """Thiết lập dữ liệu cho biểu đồ cột."""
+        self._data = metrics
+        self._metric_name = metric_name
+        self._update_plot()
+
+    def clear_data(self):
+        """Xóa dữ liệu."""
+        self._data.clear()
+        if HAS_PYQTGRAPH:
+            self.plot_widget.clear()
+
+    def _update_plot(self):
+        """Cập nhật biểu đồ."""
+        if not HAS_PYQTGRAPH or not self._data:
+            return
+
+        self.plot_widget.clear()
+        self.plot_widget.setTitle(f'So sánh {self._metric_name}')
+
+        algos = ['gbfs', 'gwo', 'hybrid']
+        y_positions = []
+        widths = []
+        colors = []
+        labels = []
+
+        for i, algo in enumerate(algos):
+            if algo in self._data:
+                y_positions.append(i)
+                widths.append(self._data[algo])
+                r, g, b = hex_to_rgb(self._colors.get(algo, COLORS.text))
+                colors.append(QColor(r, g, b))
+                labels.append(algo.upper())
+
+        if not widths:
+            return
+
+        # Vẽ các thanh ngang
+        for i, (y, w, color, label) in enumerate(zip(y_positions, widths, colors, labels)):
+            bar = pg.BarGraphItem(
+                x0=[0], y=[y], width=[w], height=0.6,
+                brush=color, pen=pg.mkPen(color, width=1)
+            )
+            self.plot_widget.addItem(bar)
+
+            # Thêm nhãn giá trị
+            text = pg.TextItem(f"{label}: {w:,.0f}", color=hex_to_qcolor(COLORS.text))
+            text.setPos(w * 0.02, y)
+            self.plot_widget.addItem(text)
+
+        # Thiết lập range
+        max_val = max(widths) if widths else 1
+        self.plot_widget.setXRange(0, max_val * 1.1)
+        self.plot_widget.setYRange(-0.5, len(algos) - 0.5)
 
 
 # =============================================================================
@@ -401,7 +486,7 @@ class WinnerBadge(QFrame):
 class ComparisonView(QWidget):
     """
     View chính cho so sánh thuật toán.
-    Bao gồm biểu đồ hội tụ, bảng hiệu suất và radar chart.
+    Bao gồm biểu đồ hội tụ, bảng hiệu suất, radar chart và biểu đồ cột.
     """
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -412,7 +497,7 @@ class ComparisonView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Sizes.PADDING_MD, Sizes.PADDING_MD,
                                   Sizes.PADDING_MD, Sizes.PADDING_MD)
-        layout.setSpacing(Sizes.PADDING_MD)
+        layout.setSpacing(Sizes.PADDING_SM)
 
         # Tiêu đề
         title = QLabel("SO SÁNH THUẬT TOÁN")
@@ -424,52 +509,86 @@ class ComparisonView(QWidget):
         self.winner_badge = WinnerBadge()
         layout.addWidget(self.winner_badge)
 
-        # Splitter chính: Charts bên trái, Table bên phải
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Grid layout cho 4 biểu đồ: 2x2
+        # [Hội tụ]     [Bảng hiệu suất]
+        # [Radar]      [Biểu đồ cột]
 
-        # Bên trái: Biểu đồ
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(Sizes.PADDING_SM)
+        content_widget = QWidget()
+        grid = QGridLayout(content_widget)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(Sizes.PADDING_SM)
 
-        # Biểu đồ hội tụ
+        # Góc trên trái: Biểu đồ hội tụ
+        convergence_frame = QFrame()
+        convergence_frame.setProperty("card", True)
+        convergence_layout = QVBoxLayout(convergence_frame)
+        convergence_layout.setContentsMargins(Sizes.PADDING_SM, Sizes.PADDING_SM,
+                                              Sizes.PADDING_SM, Sizes.PADDING_SM)
+
         convergence_label = QLabel("Biểu đồ Hội tụ")
         convergence_label.setProperty("subheading", True)
-        left_layout.addWidget(convergence_label)
+        convergence_layout.addWidget(convergence_label)
 
         self.convergence_chart = ConvergenceChart()
-        left_layout.addWidget(self.convergence_chart, 2)
+        convergence_layout.addWidget(self.convergence_chart)
 
-        # Biểu đồ radar
-        radar_label = QLabel("Biểu đồ Radar")
-        radar_label.setProperty("subheading", True)
-        left_layout.addWidget(radar_label)
+        grid.addWidget(convergence_frame, 0, 0)
 
-        self.radar_chart = RadarChart()
-        left_layout.addWidget(self.radar_chart, 1)
-
-        splitter.addWidget(left_widget)
-
-        # Bên phải: Bảng
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(Sizes.PADDING_SM)
+        # Góc trên phải: Bảng hiệu suất
+        table_frame = QFrame()
+        table_frame.setProperty("card", True)
+        table_layout = QVBoxLayout(table_frame)
+        table_layout.setContentsMargins(Sizes.PADDING_SM, Sizes.PADDING_SM,
+                                        Sizes.PADDING_SM, Sizes.PADDING_SM)
 
         table_label = QLabel("Bảng Hiệu suất")
         table_label.setProperty("subheading", True)
-        right_layout.addWidget(table_label)
+        table_layout.addWidget(table_label)
 
         self.performance_table = PerformanceTable()
-        right_layout.addWidget(self.performance_table)
+        table_layout.addWidget(self.performance_table)
 
-        splitter.addWidget(right_widget)
+        grid.addWidget(table_frame, 0, 1)
 
-        # Tỷ lệ splitter
-        splitter.setSizes([600, 400])
+        # Góc dưới trái: Biểu đồ radar
+        radar_frame = QFrame()
+        radar_frame.setProperty("card", True)
+        radar_layout = QVBoxLayout(radar_frame)
+        radar_layout.setContentsMargins(Sizes.PADDING_SM, Sizes.PADDING_SM,
+                                        Sizes.PADDING_SM, Sizes.PADDING_SM)
 
-        layout.addWidget(splitter)
+        radar_label = QLabel("Biểu đồ Radar")
+        radar_label.setProperty("subheading", True)
+        radar_layout.addWidget(radar_label)
+
+        self.radar_chart = RadarChart()
+        radar_layout.addWidget(self.radar_chart)
+
+        grid.addWidget(radar_frame, 1, 0)
+
+        # Góc dưới phải: Biểu đồ cột
+        bar_frame = QFrame()
+        bar_frame.setProperty("card", True)
+        bar_layout = QVBoxLayout(bar_frame)
+        bar_layout.setContentsMargins(Sizes.PADDING_SM, Sizes.PADDING_SM,
+                                      Sizes.PADDING_SM, Sizes.PADDING_SM)
+
+        bar_label = QLabel("So sánh Chi phí")
+        bar_label.setProperty("subheading", True)
+        bar_layout.addWidget(bar_label)
+
+        self.metric_bar_chart = MetricBarChart()
+        bar_layout.addWidget(self.metric_bar_chart)
+
+        grid.addWidget(bar_frame, 1, 1)
+
+        # Thiết lập tỷ lệ cột và hàng
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(1, 1)
+
+        layout.addWidget(content_widget)
 
     def update_comparison(self, result: Dict[str, Any]):
         """
@@ -487,7 +606,8 @@ class ComparisonView(QWidget):
         convergence_data = result.get('convergence', {})
         self.convergence_chart.clear_data()
         for algo, data in convergence_data.items():
-            self.convergence_chart.set_data(algo, data)
+            if data:  # Chỉ thêm nếu có dữ liệu
+                self.convergence_chart.set_data(algo, data)
 
         # Cập nhật bảng hiệu suất
         metrics = result.get('metrics', {})
@@ -498,6 +618,13 @@ class ComparisonView(QWidget):
         self.radar_chart.clear_data()
         for algo, values in radar_data.items():
             self.radar_chart.set_data(algo, values)
+
+        # Cập nhật biểu đồ cột với chi phí
+        cost_data = {}
+        for algo, data in metrics.items():
+            if 'final_cost' in data:
+                cost_data[algo] = data['final_cost']
+        self.metric_bar_chart.set_data(cost_data, "Chi phí")
 
         # Cập nhật winner badge
         winner = result.get('winner', '')
@@ -514,4 +641,5 @@ class ComparisonView(QWidget):
         """Xóa tất cả dữ liệu."""
         self.convergence_chart.clear_data()
         self.radar_chart.clear_data()
+        self.metric_bar_chart.clear_data()
         self.winner_badge.set_winner("--", 0)

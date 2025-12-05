@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
 
         # Status label
-        self.status_label = QLabel("San sang")
+        self.status_label = QLabel("Sẵn sàng")
         self.status_bar.addWidget(self.status_label)
 
         # Spacer
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.algo_label)
 
         # Iteration label
-        self.iter_label = QLabel("Vong lap: 0")
+        self.iter_label = QLabel("Vòng lặp: 0")
         self.status_bar.addPermanentWidget(self.iter_label)
 
     def _connect_signals(self):
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
 
     def _load_network(self):
         """Tải mạng lưới từ dữ liệu."""
-        self.status_label.setText("Dang tai mang luoi...")
+        self.status_label.setText("Đang tải mạng lưới...")
         QApplication.processEvents()
 
         try:
@@ -323,10 +323,10 @@ class MainWindow(QMainWindow):
 
             stats = self._network.get_stats()
             self.status_label.setText(
-                f"Mang luoi: {stats.total_nodes} nut, "
-                f"{stats.total_edges} canh, "
-                f"{stats.population_zones} khu vuc, "
-                f"{stats.shelters} noi tru an"
+                f"Mạng lưới: {stats.total_nodes} nút, "
+                f"{stats.total_edges} cạnh, "
+                f"{stats.population_zones} khu vực, "
+                f"{stats.shelters} nơi trú ẩn"
             )
 
             # Initialize dashboard with shelter info
@@ -339,14 +339,14 @@ class MainWindow(QMainWindow):
             self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
 
         except Exception as e:
-            QMessageBox.warning(self, "Loi", f"Khong the tai mang luoi: {e}")
-            self.status_label.setText("Loi khi tai mang luoi")
+            QMessageBox.warning(self, "Lỗi", f"Không thể tải mạng lưới: {e}")
+            self.status_label.setText("Lỗi khi tải mạng lưới")
 
     @pyqtSlot()
     def _on_run_clicked(self):
         """Xử lý khi nhấn nút Run."""
         if not self._network:
-            QMessageBox.warning(self, "Loi", "Chua tai mang luoi")
+            QMessageBox.warning(self, "Lỗi", "Chưa tải mạng lưới")
             return
 
         # Get config
@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
 
         # Update UI state
         self.control_panel.set_running_state(True)
-        self.status_label.setText("Dang chay thuat toan...")
+        self.status_label.setText("Đang chạy thuật toán...")
 
         # Check if we should compare all or run single
         compare_all = self.tab_widget.currentIndex() == 1
@@ -395,12 +395,12 @@ class MainWindow(QMainWindow):
                 self._simulation_worker.resume()
                 self.map_widget.canvas.start_animation()  # Resume animation
                 self.control_panel.set_paused_state(False)
-                self.status_label.setText("Tiep tuc mo phong...")
+                self.status_label.setText("Tiếp tục mô phỏng...")
             else:
                 self._simulation_worker.pause()
                 self.map_widget.canvas.stop_animation()  # Stop animation when paused
                 self.control_panel.set_paused_state(True)
-                self.status_label.setText("Tam dung mo phong")
+                self.status_label.setText("Tạm dừng mô phỏng")
 
     @pyqtSlot()
     def _on_reset_clicked(self):
@@ -412,11 +412,12 @@ class MainWindow(QMainWindow):
 
         self.map_widget.clear_routes()
         self.map_widget.stop_animation()
+        self.map_widget.reset_all_visual_states()  # Đặt lại màu sắc shelters và zones
         self.dashboard.reset()
         self.comparison_view.clear()
 
         self.control_panel.set_running_state(False)
-        self.status_label.setText("Da dat lai")
+        self.status_label.setText("Đã đặt lại")
 
     @pyqtSlot()
     def _on_stop_clicked(self):
@@ -424,7 +425,7 @@ class MainWindow(QMainWindow):
         self._stop_all_workers()
         self.map_widget.stop_animation()
         self.control_panel.set_running_state(False)
-        self.status_label.setText("Da dung")
+        self.status_label.setText("Đã dừng")
 
     def _stop_all_workers(self):
         """Dừng tất cả các worker threads."""
@@ -450,6 +451,7 @@ class MainWindow(QMainWindow):
 
         self.map_widget.clear_routes()
         self.map_widget.stop_animation()
+        self.map_widget.reset_all_visual_states()  # Đặt lại màu sắc shelters và zones
         self.dashboard.reset()
 
         # Update UI state
@@ -632,8 +634,8 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str, int, float)
     def _on_optimization_progress(self, algo: str, iteration: int, cost: float):
         """Xử lý cập nhật tiến trình thuật toán."""
-        self.iter_label.setText(f"Vong lap: {iteration}")
-        self.status_label.setText(f"{algo.upper()}: Vong {iteration}, Chi phi: {cost:.2f}")
+        self.iter_label.setText(f"Vòng lặp: {iteration}")
+        self.status_label.setText(f"{algo.upper()}: Vòng {iteration}, Chi phí: {cost:.2f}")
 
         # Update comparison view if on that tab
         if self.tab_widget.currentIndex() == 1:
@@ -653,8 +655,8 @@ class MainWindow(QMainWindow):
         self._start_simulation(plan)
 
         self.status_label.setText(
-            f"Hoan thanh: {len(plan.routes)} tuyen, "
-            f"{plan.total_evacuees:,} nguoi"
+            f"Hoàn thành: {len(plan.routes)} tuyến, "
+            f"{plan.total_evacuees:,} người"
         )
 
     @pyqtSlot(object)
@@ -687,14 +689,7 @@ class MainWindow(QMainWindow):
                 1 - (metrics.average_path_length / 20 if metrics.average_path_length else 0.5)  # Hiệu quả
             ]
 
-        # Thêm plans vào dữ liệu so sánh để hiển thị trên bản đồ
-        for algo, plan in result.plans.items():
-            comparison_data['plans'][algo.value] = plan
-
-        # Thiết lập network cho comparison view
-        if self._network:
-            self.comparison_view.set_network(self._network)
-
+        # Cập nhật comparison view
         self.comparison_view.update_comparison(comparison_data)
 
         # Show best plan on map
@@ -708,7 +703,7 @@ class MainWindow(QMainWindow):
 
         self.control_panel.set_completed_state()
         self.status_label.setText(
-            f"So sanh hoan thanh! Chien thang: {result.winner.value if result.winner else 'N/A'}"
+            f"So sánh hoàn thành! Chiến thắng: {result.winner.value if result.winner else 'N/A'}"
         )
 
     def _start_simulation(self, plan: EvacuationPlan):
@@ -763,15 +758,15 @@ class MainWindow(QMainWindow):
         self.map_widget.stop_animation()
         self.control_panel.set_completed_state()
         self.status_label.setText(
-            f"Mo phong hoan thanh! Da so tan: {metrics.total_evacuated:,} nguoi"
+            f"Mô phỏng hoàn thành! Đã sơ tán: {metrics.total_evacuated:,} người"
         )
 
     @pyqtSlot(str)
     def _on_error(self, error_msg: str):
         """Xử lý lỗi."""
         self.control_panel.set_running_state(False)
-        self.status_label.setText(f"Loi: {error_msg}")
-        QMessageBox.critical(self, "Loi", f"Da xay ra loi:\n{error_msg}")
+        self.status_label.setText(f"Lỗi: {error_msg}")
+        QMessageBox.critical(self, "Lỗi", f"Đã xảy ra lỗi:\n{error_msg}")
 
     def closeEvent(self, event: QCloseEvent):
         """Xử lý khi đóng cửa sổ."""

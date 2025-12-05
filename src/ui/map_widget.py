@@ -115,6 +115,14 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         self.setBrush(QBrush(color))
         self._update_tooltip()
 
+    def reset_visual_state(self):
+        """Đặt lại trạng thái hiển thị về mặc định."""
+        self._is_selected = False
+        self.setScale(1.0)
+        self.setBrush(QBrush(hex_to_qcolor(COLORS.cyan, 200)))
+        self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
+        self._update_tooltip()
+
 
 class ShelterItem(QGraphicsRectItem):
     """Hiển thị nơi trú ẩn trên bản đồ."""
@@ -215,6 +223,18 @@ class ShelterItem(QGraphicsRectItem):
         if not self._is_selected:
             self.setPen(QPen(border_color, 2))
             self.setScale(scale)
+        self._update_tooltip()
+        # Invalidate cache để cập nhật hiển thị
+        self.setCacheMode(QGraphicsItem.CacheMode.NoCache)
+        self.update()
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
+
+    def reset_visual_state(self):
+        """Đặt lại trạng thái hiển thị về mặc định."""
+        self._is_selected = False
+        self.setScale(1.0)
+        self.setBrush(QBrush(hex_to_qcolor(COLORS.success, 220)))
+        self.setPen(QPen(hex_to_qcolor(COLORS.success_dark), 2))
         self._update_tooltip()
         # Invalidate cache để cập nhật hiển thị
         self.setCacheMode(QGraphicsItem.CacheMode.NoCache)
@@ -1057,6 +1077,13 @@ class MapCanvas(QGraphicsView):
         if shelter_id in self._shelter_items:
             self._shelter_items[shelter_id].update_occupancy(occupancy)
 
+    def reset_all_visual_states(self):
+        """Đặt lại trạng thái hiển thị của tất cả shelters và zones về mặc định."""
+        for zone_item in self._zone_items.values():
+            zone_item.reset_visual_state()
+        for shelter_item in self._shelter_items.values():
+            shelter_item.reset_visual_state()
+
     def update_hazard(self, hazard_index: int, radius_km: float, risk_level: float):
         """Cập nhật vùng nguy hiểm."""
         if hazard_index in self._hazard_items:
@@ -1289,6 +1316,10 @@ class MapWidget(QWidget):
     def update_shelter_occupancy(self, shelter_id: str, occupancy: int):
         """Cập nhật mức lấp đầy nơi trú ẩn."""
         self.canvas.update_shelter_occupancy(shelter_id, occupancy)
+
+    def reset_all_visual_states(self):
+        """Đặt lại trạng thái hiển thị của tất cả shelters và zones."""
+        self.canvas.reset_all_visual_states()
 
     def update_hazard(self, hazard_index: int, radius_km: float, risk_level: float):
         """Cập nhật vùng nguy hiểm."""

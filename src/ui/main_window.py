@@ -144,7 +144,18 @@ class SimulationWorker(QThread):
                     break
 
                 metrics = self.engine.step()
-                self.step_completed.emit(metrics.to_dict())
+                metrics_dict = metrics.to_dict()
+
+                # Add zone evacuation progress (aggregate departed per zone)
+                zone_evacuated = {}
+                for route_id, state in self.engine.get_route_states().items():
+                    zone_id = state.route.zone_id
+                    if zone_id not in zone_evacuated:
+                        zone_evacuated[zone_id] = 0
+                    zone_evacuated[zone_id] += state.departed
+                metrics_dict['zone_evacuated'] = zone_evacuated
+
+                self.step_completed.emit(metrics_dict)
                 self.msleep(10)  # Faster updates for quicker simulation
 
             if not self._should_stop:
@@ -738,6 +749,11 @@ class MainWindow(QMainWindow):
                 if shelter.id in self.map_widget.canvas._shelter_items:
                     self.map_widget.canvas._shelter_items[shelter.id].update_occupancy(arrivals)
             metrics['remaining_shelter_capacity'] = max(0, total_capacity - total_arrivals)
+
+            # Update zone evacuation progress on map
+            zone_evacuated = metrics.get('zone_evacuated', {})
+            for zone_id, evacuated in zone_evacuated.items():
+                self.map_widget.update_zone_progress(zone_id, evacuated)
 
         self.dashboard.update_metrics(metrics)
 

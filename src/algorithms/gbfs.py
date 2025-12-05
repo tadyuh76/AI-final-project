@@ -62,19 +62,22 @@ class GreedyBestFirstSearch(BaseAlgorithm):
     def algorithm_type(self) -> AlgorithmType:
         return AlgorithmType.GBFS
 
-    def heuristic(self, node: Node, goal: Shelter) -> float:
+    def heuristic(self, node: Node, goal: Shelter,
+                  node_risk: float, node_congestion: float) -> float:
         """
         Tính giá trị heuristic đa mục tiêu cho GBFS.
 
         Kết hợp 4 yếu tố:
         - Khoảng cách đến shelter
-        - Rủi ro tại vị trí hiện tại
-        - Tắc nghẽn giao thông
+        - Rủi ro tại vị trí hiện tại (pre-computed)
+        - Tắc nghẽn giao thông (pre-computed)
         - Sức chứa còn lại của shelter
 
         Args:
             node: Nút hiện tại
             goal: Nơi trú ẩn đích
+            node_risk: Rủi ro đã tính trước tại node
+            node_congestion: Tắc nghẽn đã tính trước tại node
 
         Returns:
             Giá trị heuristic (thấp hơn là tốt hơn)
@@ -82,11 +85,11 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         # 1. Khoảng cách đến shelter (km)
         h_dist = haversine_distance(node.lat, node.lon, goal.lat, goal.lon)
 
-        # 2. Rủi ro tại vị trí hiện tại (0-1)
-        h_risk = self.network.get_total_risk_at(node.lat, node.lon)
+        # 2. Rủi ro tại vị trí hiện tại (0-1) - đã tính trước
+        h_risk = node_risk
 
-        # 3. Tắc nghẽn cục bộ (0-1)
-        h_congestion = self._get_local_congestion(node.id)
+        # 3. Tắc nghẽn cục bộ (0-1) - đã tính trước
+        h_congestion = node_congestion
 
         # 4. Penalty cho shelter gần đầy (0-10)
         if goal.capacity > 0:
@@ -147,46 +150,66 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         if not available_shelters:
             return None, None, float('inf')
 
-        # Tạo tập hợp đích - sử dụng cả ID shelter và ID nút gần nhất
-        goal_ids = set()
-        shelter_map = {}
-        shelter_nearest_nodes = {}  # Map từ nearest node ID -> shelter
-
-        for s in available_shelters:
-            goal_ids.add(s.id)
-            shelter_map[s.id] = s
-            # Cũng tìm nút gần nhất với shelter để có thể tìm đường qua đó
-            nearest_to_shelter = self.network.find_nearest_node(s.lat, s.lon)
-            if nearest_to_shelter and nearest_to_shelter.id != s.id:
-                shelter_nearest_nodes[nearest_to_shelter.id] = s
-
-        # Hàng đợi ưu tiên: (f_cost, counter, SearchNode)
-        # Counter để phá vỡ sự ràng buộc tránh so sánh SearchNodes
-        counter = 0
-        open_set: List[Tuple[float, int, SearchNode]] = []
-
-        # Bắt đầu từ chính nút zone (nếu zone được kết nối với mạng)
-        # hoặc từ giao lộ gần nhất
+        # Lấy source node
         zone_node = self.network.get_node(source.id)
         if zone_node:
-            # Zone tồn tại trong mạng, bắt đầu từ đó
             source_node = zone_node
         else:
-            # Dự phòng: tìm giao lộ gần nhất với nguồn
             source_node = self.network.find_nearest_node(source.lat, source.lon)
 
         if not source_node:
             return None, None, float('inf')
 
-        # Khởi tạo với nút nguồn
-        start = SearchNode(
-            node_id=source_node.id,
-            h_cost=min(self.heuristic(source_node, s) for s in available_shelters)
-        )
+        # GBFS thuần túy: chọn MỘT shelter tốt nhất dựa trên heuristic từ source
+        # Sắp xếp shelters theo heuristic và thử từng cái cho đến khi tìm được đường
+        source_risk = self.network.get_total_risk_at(source_node.lat, source_node.lon)
+        source_congestion = self._get_local_congestion(source_node.id)
+
+        # Xếp hạng shelters theo heuristic
+        shelter_rankings = []
+        for s in available_shelters:
+            h = self.heuristic(source_node, s, source_risk, source_congestion)
+            shelter_rankings.append((h, s))
+        shelter_rankings.sort(key=lambda x: x[0])
+
+        # Thử từng shelter theo thứ tự ưu tiên (tối đa 5)
+        for _, target_shelter in shelter_rankings[:5]:
+            path, cost = self._search_to_shelter(source_node, target_shelter, allow_emergency)
+            if path:
+                return path, target_shelter, cost
+
+        return None, None, float('inf')
+
+    def _search_to_shelter(self, source_node: Node, target_shelter: Shelter,
+                           allow_emergency: bool) -> Tuple[Optional[List[str]], float]:
+        """
+        Tìm đường đến MỘT shelter cụ thể - GBFS thuần túy.
+
+        Args:
+            source_node: Nút xuất phát
+            target_shelter: Shelter đích duy nhất
+            allow_emergency: Cho phép đi qua vùng nguy hiểm
+
+        Returns:
+            Tuple của (path, cost) hoặc (None, inf)
+        """
+        # Goal có thể là shelter trực tiếp hoặc nút gần nhất
+        goal_id = target_shelter.id
+        nearest_to_shelter = self.network.find_nearest_node(target_shelter.lat, target_shelter.lon)
+        nearest_id = nearest_to_shelter.id if nearest_to_shelter and nearest_to_shelter.id != goal_id else None
+
+        # Hàng đợi ưu tiên
+        counter = 0
+        open_set: List[Tuple[float, int, SearchNode]] = []
+
+        # Khởi tạo
+        start_h = self.heuristic(source_node, target_shelter,
+                                 self.network.get_total_risk_at(source_node.lat, source_node.lon),
+                                 self._get_local_congestion(source_node.id))
+        start = SearchNode(node_id=source_node.id, h_cost=start_h)
         heapq.heappush(open_set, (start.h_cost, counter, start))
         counter += 1
 
-        # Tập hợp đã thăm
         visited: Set[str] = set()
 
         while open_set:
@@ -195,64 +218,48 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
             _, _, current = heapq.heappop(open_set)
 
-            # Bỏ qua nếu đã thăm
             if current.node_id in visited:
                 continue
             visited.add(current.node_id)
 
-            # Kiểm tra nếu đã đến đích (nơi trú ẩn)
-            if current.node_id in goal_ids:
-                # Đã đến trực tiếp shelter node
-                path = self._reconstruct_path(current)
-                shelter = shelter_map[current.node_id]
-                return path, shelter, current.h_cost
+            # Đã đến shelter trực tiếp
+            if current.node_id == goal_id:
+                return self._reconstruct_path(current), current.h_cost
 
-            # Kiểm tra nếu đã đến nút gần shelter (shelter có thể không nằm trong đồ thị chính)
-            if current.node_id in shelter_nearest_nodes:
-                shelter = shelter_nearest_nodes[current.node_id]
-                # Kiểm tra xem có cạnh trực tiếp đến shelter không
-                edge_to_shelter = self.network.get_edge_between(current.node_id, shelter.id)
+            # Đã đến nút gần shelter - kiểm tra cạnh trực tiếp
+            if current.node_id == nearest_id:
+                edge_to_shelter = self.network.get_edge_between(current.node_id, goal_id)
                 if edge_to_shelter and not edge_to_shelter.is_blocked:
                     path = self._reconstruct_path(current)
-                    path.append(shelter.id)  # Thêm shelter vào cuối đường đi
-                    return path, shelter, current.h_cost
+                    path.append(goal_id)
+                    return path, current.h_cost
 
-            # Mở rộng các láng giềng
+            # Mở rộng neighbors
             for neighbor_id in self.network.get_neighbors(current.node_id):
                 if neighbor_id in visited:
                     continue
 
-                # Kiểm tra cạnh có hợp lệ không
                 edge = self.network.get_edge_between(current.node_id, neighbor_id)
                 if not edge or edge.is_blocked:
                     continue
 
-                # Kiểm tra rủi ro cạnh (block high-risk edges unless emergency)
                 if not allow_emergency and edge.flood_risk > 0.6:
                     continue
 
-                # Lấy nút láng giềng cho heuristic
                 neighbor_node = self.network.get_node(neighbor_id)
                 if not neighbor_node:
                     continue
 
-                # Tính heuristic đa mục tiêu đến shelter tốt nhất
-                # GBFS thuần túy: chỉ dùng h(n), không dùng g(n)
-                h_cost = min(
-                    self.heuristic(neighbor_node, s)
-                    for s in available_shelters
-                )
+                # Heuristic đến MỘT shelter duy nhất
+                neighbor_risk = self.network.get_total_risk_at(neighbor_node.lat, neighbor_node.lon)
+                neighbor_congestion = self._get_local_congestion(neighbor_id)
+                h_cost = self.heuristic(neighbor_node, target_shelter, neighbor_risk, neighbor_congestion)
 
-                neighbor = SearchNode(
-                    node_id=neighbor_id,
-                    h_cost=h_cost,
-                    parent=current
-                )
-
+                neighbor = SearchNode(node_id=neighbor_id, h_cost=h_cost, parent=current)
                 heapq.heappush(open_set, (neighbor.h_cost, counter, neighbor))
                 counter += 1
 
-        return None, None, float('inf')
+        return None, float('inf')
 
     def _reconstruct_path(self, node: SearchNode) -> List[str]:
         """Tái tạo đường đi từ chuỗi SearchNode."""

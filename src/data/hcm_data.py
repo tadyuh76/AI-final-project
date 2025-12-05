@@ -129,145 +129,291 @@ class ShelterTemplate:
 
 
 # Các điểm trú ẩn chính ở Thành phố Hồ Chí Minh
-# Đây là các địa điểm thực tế có thể phục vụ như điểm sơ tán
+# 50 điểm trú ẩn phân bổ đều khắp thành phố, sức chứa x2
+# Tổng sức chứa mục tiêu: ~800,000 người
 HCM_SHELTERS: List[ShelterTemplate] = [
-    # Sân vận động
+    # ==================== THỦ ĐỨC (Đông Bắc - 6 shelters) ====================
     ShelterTemplate(
-        name='Thong Nhat Stadium',
-        lat=10.7888, lon=106.6875,
-        capacity=15000, shelter_type='stadium', district='district_10'
+        name='Vietnam National University',
+        lat=10.8752, lon=106.8019,
+        capacity=50000, shelter_type='university', district='thu_duc'
     ),
     ShelterTemplate(
-        name='Phu Tho Stadium',
-        lat=10.7621, lon=106.6523,
-        capacity=12000, shelter_type='stadium', district='district_11'
+        name='Suoi Tien Theme Park',
+        lat=10.8720, lon=106.7950,
+        capacity=40000, shelter_type='park', district='thu_duc'
     ),
     ShelterTemplate(
-        name='Quan Khu 7 Stadium',
-        lat=10.8512, lon=106.7612,
-        capacity=8000, shelter_type='stadium', district='thu_duc'
+        name='Linh Trung Industrial Zone',
+        lat=10.8650, lon=106.7900,
+        capacity=30000, shelter_type='industrial', district='thu_duc'
+    ),
+    ShelterTemplate(
+        name='Gigamall Thu Duc',
+        lat=10.8350, lon=106.7650,
+        capacity=30000, shelter_type='mall', district='thu_duc'
+    ),
+    ShelterTemplate(
+        name='FPT University HCMC',
+        lat=10.8410, lon=106.8100,
+        capacity=20000, shelter_type='university', district='thu_duc'
+    ),
+    ShelterTemplate(
+        name='Cat Lai Port Area',
+        lat=10.7680, lon=106.7850,
+        capacity=20000, shelter_type='industrial', district='thu_duc'
     ),
 
-    # Đại học (sức chứa lớn)
+    # ==================== QUẬN 12 (Bắc - 4 shelters) ====================
     ShelterTemplate(
-        name='HCMC University of Technology',
-        lat=10.7725, lon=106.6576,
-        capacity=5000, shelter_type='university', district='district_10'
+        name='AEON Mall Binh Duong Canary',
+        lat=10.8750, lon=106.6550,
+        capacity=30000, shelter_type='mall', district='district_12'
     ),
     ShelterTemplate(
-        name='University of Social Sciences',
-        lat=10.7829, lon=106.6996,
-        capacity=4000, shelter_type='university', district='district_1'
+        name='Tan Phu Trung Industrial Zone',
+        lat=10.8800, lon=106.6100,
+        capacity=24000, shelter_type='industrial', district='district_12'
     ),
     ShelterTemplate(
-        name='HCMC University of Economics',
-        lat=10.7859, lon=106.6962,
-        capacity=4000, shelter_type='university', district='district_3'
+        name='District 12 Stadium',
+        lat=10.8650, lon=106.6450,
+        capacity=16000, shelter_type='stadium', district='district_12'
+    ),
+    ShelterTemplate(
+        name='District 12 Sports Center',
+        lat=10.8680, lon=106.6450,
+        capacity=8000, shelter_type='sports', district='district_12'
+    ),
+
+    # ==================== GÒ VẤP (Bắc Trung Tâm - 4 shelters) ====================
+    ShelterTemplate(
+        name='Industrial University of HCMC',
+        lat=10.8280, lon=106.6850,
+        capacity=20000, shelter_type='university', district='go_vap'
+    ),
+    ShelterTemplate(
+        name='Go Vap Stadium',
+        lat=10.8350, lon=106.6700,
+        capacity=16000, shelter_type='stadium', district='go_vap'
+    ),
+    ShelterTemplate(
+        name='Lotte Mart Go Vap',
+        lat=10.8380, lon=106.6720,
+        capacity=20000, shelter_type='mall', district='go_vap'
+    ),
+    ShelterTemplate(
+        name='Go Vap Central Park',
+        lat=10.8350, lon=106.6750,
+        capacity=12000, shelter_type='park', district='go_vap'
+    ),
+
+    # ==================== TÂN BÌNH (Tây Bắc - 3 shelters) ====================
+    ShelterTemplate(
+        name='Tan Binh Industrial Park',
+        lat=10.8150, lon=106.6250,
+        capacity=20000, shelter_type='industrial', district='tan_binh'
+    ),
+    ShelterTemplate(
+        name='Tan Binh Stadium',
+        lat=10.8050, lon=106.6500,
+        capacity=14000, shelter_type='stadium', district='tan_binh'
     ),
     ShelterTemplate(
         name='Saigon University',
         lat=10.7998, lon=106.6659,
-        capacity=3500, shelter_type='university', district='tan_binh'
-    ),
-    ShelterTemplate(
-        name='Vietnam National University',
-        lat=10.8752, lon=106.8019,
-        capacity=8000, shelter_type='university', district='thu_duc'
+        capacity=16000, shelter_type='university', district='tan_binh'
     ),
 
-    # Bệnh viện (sức chứa hạn chế nhưng thiết yếu)
+    # ==================== TÂN PHÚ (Tây - 3 shelters) ====================
     ShelterTemplate(
-        name='Cho Ray Hospital',
-        lat=10.7546, lon=106.6621,
-        capacity=800, shelter_type='hospital', district='district_5'
+        name='AEON Mall Tan Phu',
+        lat=10.7866, lon=106.6212,
+        capacity=40000, shelter_type='mall', district='tan_phu'
     ),
     ShelterTemplate(
-        name='115 Emergency Hospital',
-        lat=10.7738, lon=106.6729,
-        capacity=500, shelter_type='hospital', district='district_10'
+        name='Tan Phu High School Complex',
+        lat=10.7900, lon=106.6300,
+        capacity=10000, shelter_type='school', district='tan_phu'
     ),
     ShelterTemplate(
-        name='Thu Duc Hospital',
-        lat=10.8513, lon=106.7597,
-        capacity=600, shelter_type='hospital', district='thu_duc'
-    ),
-
-    # Trung tâm Cộng đồng & Trung tâm Hội nghị
-    ShelterTemplate(
-        name='Saigon Exhibition Center (SECC)',
-        lat=10.7445, lon=106.7260,
-        capacity=10000, shelter_type='convention', district='district_7'
-    ),
-    ShelterTemplate(
-        name='White Palace Convention Center',
-        lat=10.8089, lon=106.7157,
-        capacity=5000, shelter_type='convention', district='binh_thanh'
-    ),
-    ShelterTemplate(
-        name='GEM Center',
-        lat=10.7831, lon=106.6950,
-        capacity=3000, shelter_type='convention', district='district_1'
+        name='Tan Phu District Hospital',
+        lat=10.7850, lon=106.6280,
+        capacity=4000, shelter_type='hospital', district='tan_phu'
     ),
 
-    # Trường học (phân bổ khắp các quận)
-    ShelterTemplate(
-        name='Le Hong Phong High School',
-        lat=10.7815, lon=106.6885,
-        capacity=2000, shelter_type='school', district='district_5'
-    ),
-    ShelterTemplate(
-        name='Tran Dai Nghia High School',
-        lat=10.7673, lon=106.6927,
-        capacity=1800, shelter_type='school', district='district_1'
-    ),
-    ShelterTemplate(
-        name='Nguyen Thi Minh Khai High School',
-        lat=10.7897, lon=106.6818,
-        capacity=1800, shelter_type='school', district='district_3'
-    ),
-    ShelterTemplate(
-        name='Marie Curie High School',
-        lat=10.7887, lon=106.6751,
-        capacity=1500, shelter_type='school', district='district_3'
-    ),
-    ShelterTemplate(
-        name='Gia Dinh High School',
-        lat=10.8139, lon=106.6993,
-        capacity=1600, shelter_type='school', district='binh_thanh'
-    ),
-    ShelterTemplate(
-        name='Nguyen Huu Huan High School',
-        lat=10.8532, lon=106.7478,
-        capacity=1500, shelter_type='school', district='thu_duc'
-    ),
-
-    # Công trình tôn giáo (điểm tụ tập cộng đồng)
-    ShelterTemplate(
-        name='Notre-Dame Cathedral',
-        lat=10.7798, lon=106.6990,
-        capacity=1000, shelter_type='religious', district='district_1'
-    ),
-    ShelterTemplate(
-        name='Vinh Nghiem Pagoda',
-        lat=10.7924, lon=106.6812,
-        capacity=800, shelter_type='religious', district='district_3'
-    ),
-
-    # Trung tâm thương mại (không gian lớn có mái che)
+    # ==================== BÌNH TÂN (Tây Nam - 4 shelters) ====================
     ShelterTemplate(
         name='AEON Mall Binh Tan',
         lat=10.7483, lon=106.6078,
-        capacity=8000, shelter_type='mall', district='binh_tan'
+        capacity=40000, shelter_type='mall', district='binh_tan'
+    ),
+    ShelterTemplate(
+        name='Tan Tao Industrial Zone',
+        lat=10.7420, lon=106.5950,
+        capacity=30000, shelter_type='industrial', district='binh_tan'
+    ),
+    ShelterTemplate(
+        name='Vinh Loc Industrial Park',
+        lat=10.7350, lon=106.5850,
+        capacity=24000, shelter_type='industrial', district='binh_tan'
+    ),
+    ShelterTemplate(
+        name='Big C Binh Tan',
+        lat=10.7550, lon=106.6150,
+        capacity=16000, shelter_type='mall', district='binh_tan'
+    ),
+
+    # ==================== QUẬN 6 & 8 (Tây Nam - 3 shelters) ====================
+    ShelterTemplate(
+        name='Phu Lam Park',
+        lat=10.7420, lon=106.6280,
+        capacity=10000, shelter_type='park', district='district_6'
+    ),
+    ShelterTemplate(
+        name='Binh Phu Community Center',
+        lat=10.7480, lon=106.6250,
+        capacity=8000, shelter_type='school', district='district_6'
+    ),
+    ShelterTemplate(
+        name='District 8 Evacuation Center',
+        lat=10.7255, lon=106.6373,
+        capacity=15000, shelter_type='convention', district='district_8'
+    ),
+
+    # ==================== QUẬN 11 (Trung Tâm Tây - 2 shelters) ====================
+    ShelterTemplate(
+        name='Phu Tho Stadium',
+        lat=10.7621, lon=106.6523,
+        capacity=40000, shelter_type='stadium', district='district_11'
+    ),
+    ShelterTemplate(
+        name='Dam Sen Park',
+        lat=10.7680, lon=106.6380,
+        capacity=30000, shelter_type='park', district='district_11'
+    ),
+
+    # ==================== QUẬN 10 (Trung Tâm - 2 shelters) ====================
+    ShelterTemplate(
+        name='Thong Nhat Stadium',
+        lat=10.7888, lon=106.6875,
+        capacity=50000, shelter_type='stadium', district='district_10'
+    ),
+    ShelterTemplate(
+        name='HCMC University of Technology',
+        lat=10.7725, lon=106.6576,
+        capacity=30000, shelter_type='university', district='district_10'
+    ),
+
+    # ==================== QUẬN 5 (Trung Tâm - 2 shelters) ====================
+    ShelterTemplate(
+        name='HCMC University of Education',
+        lat=10.7640, lon=106.6820,
+        capacity=20000, shelter_type='university', district='district_5'
+    ),
+    ShelterTemplate(
+        name='Cho Ray Hospital Area',
+        lat=10.7546, lon=106.6621,
+        capacity=6000, shelter_type='hospital', district='district_5'
+    ),
+
+    # ==================== QUẬN 3 (Trung Tâm - 2 shelters) ====================
+    ShelterTemplate(
+        name='HCMC University of Economics',
+        lat=10.7859, lon=106.6962,
+        capacity=20000, shelter_type='university', district='district_3'
+    ),
+    ShelterTemplate(
+        name='Vinh Nghiem Pagoda Complex',
+        lat=10.7924, lon=106.6812,
+        capacity=8000, shelter_type='religious', district='district_3'
+    ),
+
+    # ==================== PHÚ NHUẬN (Trung Tâm Đông - 2 shelters) ====================
+    ShelterTemplate(
+        name='Gia Dinh Park',
+        lat=10.8100, lon=106.6900,
+        capacity=20000, shelter_type='park', district='phu_nhuan'
+    ),
+    ShelterTemplate(
+        name='Phu Nhuan Community Center',
+        lat=10.8000, lon=106.6800,
+        capacity=8000, shelter_type='school', district='phu_nhuan'
+    ),
+
+    # ==================== BÌNH THẠNH (Đông - 3 shelters) ====================
+    ShelterTemplate(
+        name='White Palace Convention Center',
+        lat=10.8089, lon=106.7157,
+        capacity=30000, shelter_type='convention', district='binh_thanh'
+    ),
+    ShelterTemplate(
+        name='Van Lang University',
+        lat=10.8180, lon=106.7020,
+        capacity=20000, shelter_type='university', district='binh_thanh'
+    ),
+    ShelterTemplate(
+        name='Van Thanh Park',
+        lat=10.7950, lon=106.7150,
+        capacity=16000, shelter_type='park', district='binh_thanh'
+    ),
+
+    # ==================== QUẬN 1 (Trung Tâm - 2 shelters) ====================
+    ShelterTemplate(
+        name='Tao Dan Park',
+        lat=10.7780, lon=106.6920,
+        capacity=20000, shelter_type='park', district='district_1'
+    ),
+    ShelterTemplate(
+        name='September 23 Park',
+        lat=10.7620, lon=106.6920,
+        capacity=16000, shelter_type='park', district='district_1'
+    ),
+
+    # ==================== QUẬN 4 (Nam Trung Tâm - 1 shelter) ====================
+    ShelterTemplate(
+        name='District 4 Community Center',
+        lat=10.7579, lon=106.7057,
+        capacity=10000, shelter_type='convention', district='district_4'
+    ),
+
+    # ==================== QUẬN 7 (Nam - 4 shelters) ====================
+    ShelterTemplate(
+        name='Saigon Exhibition Center (SECC)',
+        lat=10.7445, lon=106.7260,
+        capacity=60000, shelter_type='convention', district='district_7'
     ),
     ShelterTemplate(
         name='SC VivoCity',
         lat=10.7297, lon=106.7211,
-        capacity=6000, shelter_type='mall', district='district_7'
+        capacity=36000, shelter_type='mall', district='district_7'
     ),
     ShelterTemplate(
-        name='AEON Mall Tan Phu',
-        lat=10.7866, lon=106.6212,
-        capacity=7000, shelter_type='mall', district='tan_phu'
+        name='Ton Duc Thang University',
+        lat=10.7320, lon=106.6990,
+        capacity=24000, shelter_type='university', district='district_7'
+    ),
+    ShelterTemplate(
+        name='District 7 Sports Complex',
+        lat=10.7320, lon=106.7150,
+        capacity=20000, shelter_type='stadium', district='district_7'
+    ),
+
+    # ==================== NHÀ BÈ (Cực Nam - 3 shelters) ====================
+    ShelterTemplate(
+        name='Hiep Phuoc Industrial Zone',
+        lat=10.6850, lon=106.7500,
+        capacity=16000, shelter_type='industrial', district='nha_be'
+    ),
+    ShelterTemplate(
+        name='Nha Be District Center',
+        lat=10.6947, lon=106.7378,
+        capacity=10000, shelter_type='convention', district='nha_be'
+    ),
+    ShelterTemplate(
+        name='Nha Be South Community Center',
+        lat=10.6700, lon=106.7200,
+        capacity=8000, shelter_type='school', district='nha_be'
     ),
 ]
 

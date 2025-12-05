@@ -151,16 +151,32 @@ class GreyWolfOptimizer(BaseAlgorithm):
         """
         Tính chi phí thực tế bằng cách tìm đường qua mạng lưới.
         Chậm hơn nhưng chính xác hơn nhiều cho Hybrid algorithm.
-        """
-        import heapq
 
+        Tối ưu: Sử dụng single-source Dijkstra cho mỗi zone thay vì A* riêng biệt.
+        """
         total_pairs = self.n_zones * self.n_shelters
         computed = 0
 
+        # Báo cáo bắt đầu precompute
+        self.report_progress(0, 0, {
+            'phase': 'precompute',
+            'progress': '0%',
+            'computed': 0,
+            'total': total_pairs,
+            'message': f'Đang tính toán {total_pairs} đường đi...'
+        })
+
         for i, zone in enumerate(self.zones):
+            # Tính đường đi từ zone này đến TẤT CẢ shelters một lần
+            paths_from_zone = self._compute_paths_from_zone(zone)
+
             for j, shelter in enumerate(self.shelters):
-                # Tìm đường đi thực tế và tính các metrics
-                path, distance, time_hours, max_risk = self._find_path_with_metrics(zone, shelter)
+                # Lấy kết quả từ cache hoặc tính riêng nếu không có
+                if shelter.id in paths_from_zone:
+                    path, distance, time_hours, max_risk = paths_from_zone[shelter.id]
+                else:
+                    # Fallback: tính riêng nếu Dijkstra không tìm được
+                    path, distance, time_hours, max_risk = self._find_path_with_metrics(zone, shelter)
 
                 self._distance_matrix[i, j] = distance
                 self._time_matrix[i, j] = time_hours
@@ -169,15 +185,130 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
                 computed += 1
 
-                # Báo cáo tiến trình mỗi 10%
-                if computed % max(1, total_pairs // 10) == 0:
-                    progress = computed / total_pairs * 100
-                    self.report_progress(0, 0, {
-                        'phase': 'precompute',
-                        'progress': f'{progress:.0f}%',
-                        'computed': computed,
-                        'total': total_pairs
-                    })
+            # Báo cáo tiến trình sau mỗi zone (thường xuyên hơn)
+            progress = computed / total_pairs * 100
+            self.report_progress(0, 0, {
+                'phase': 'precompute',
+                'progress': f'{progress:.0f}%',
+                'computed': computed,
+                'total': total_pairs,
+                'message': f'Zone {i+1}/{self.n_zones}'
+            })
+
+    def _compute_paths_from_zone(self, zone: PopulationZone) -> Dict[str, tuple]:
+        """
+        Sử dụng Dijkstra single-source để tìm đường đến tất cả shelters từ một zone.
+        Nhanh hơn nhiều so với chạy A* riêng biệt cho mỗi cặp zone-shelter.
+
+        Returns:
+            Dict mapping shelter_id -> (path, distance_km, time_hours, max_risk)
+        """
+        import heapq
+
+        results = {}
+
+        # Lấy zone node
+        zone_in_network = self.network.get_node(zone.id)
+        zone_node = zone_in_network if zone_in_network else self.network.find_nearest_node(zone.lat, zone.lon)
+
+        if not zone_node:
+            return results  # Empty - will use fallback
+
+        # Tạo set các shelter IDs và node gần shelter để kiểm tra nhanh
+        shelter_ids = {s.id for s in self.shelters}
+        shelter_nearest = {}
+        for s in self.shelters:
+            s_in_network = self.network.get_node(s.id)
+            if s_in_network:
+                shelter_nearest[s.id] = s_in_network
+            else:
+                nearest = self.network.find_nearest_node(s.lat, s.lon)
+                if nearest:
+                    shelter_nearest[s.id] = nearest
+
+        # Dijkstra từ zone đến tất cả nodes
+        # Priority queue: (cost, counter, node_id, path, total_dist, total_time, max_risk)
+        counter = 0
+        if zone_in_network:
+            start_entry = (0.0, counter, zone_node.id, [zone_node.id], 0.0, 0.0, 0.0)
+        else:
+            start_entry = (0.0, counter, zone_node.id, [zone.id, zone_node.id], 0.0, 0.0, 0.0)
+
+        open_set = [start_entry]
+        visited = set()
+        g_costs = {zone_node.id: 0.0}
+        found_shelters = set()
+
+        while open_set and len(found_shelters) < len(self.shelters):
+            cost, _, current_id, path, total_dist, total_time, max_risk = heapq.heappop(open_set)
+
+            if current_id in visited:
+                continue
+            visited.add(current_id)
+
+            # Cập nhật max_risk tại node hiện tại
+            current_node = self.network.get_node(current_id)
+            if current_node:
+                node_risk = self.network.get_total_risk_at(current_node.lat, current_node.lon)
+                max_risk = max(max_risk, node_risk)
+
+            # Kiểm tra nếu đến shelter
+            if current_id in shelter_ids and current_id not in found_shelters:
+                results[current_id] = (path, total_dist, total_time, max_risk)
+                found_shelters.add(current_id)
+
+            # Kiểm tra nếu đến node gần shelter
+            for shelter_id, nearest_node in shelter_nearest.items():
+                if shelter_id in found_shelters:
+                    continue
+                if current_id == nearest_node.id:
+                    edge_to_shelter = self.network.get_edge_between(current_id, shelter_id)
+                    if edge_to_shelter and not edge_to_shelter.is_blocked:
+                        final_path = path + [shelter_id]
+                        shelter_obj = next((s for s in self.shelters if s.id == shelter_id), None)
+                        if shelter_obj:
+                            shelter_risk = self.network.get_total_risk_at(shelter_obj.lat, shelter_obj.lon)
+                            final_risk = max(max_risk, edge_to_shelter.flood_risk, shelter_risk)
+                            results[shelter_id] = (
+                                final_path,
+                                total_dist + edge_to_shelter.length_km,
+                                total_time + edge_to_shelter.current_travel_time,
+                                final_risk
+                            )
+                            found_shelters.add(shelter_id)
+
+            # Mở rộng neighbors
+            for neighbor_id in self.network.get_neighbors(current_id):
+                if neighbor_id in visited:
+                    continue
+
+                edge = self.network.get_edge_between(current_id, neighbor_id)
+                if not edge or edge.is_blocked:
+                    continue
+
+                # Tính chi phí edge (có penalty cho high risk)
+                edge_cost = edge.length_km
+                if edge.flood_risk > 0.6:
+                    edge_cost *= 100
+                elif edge.flood_risk > 0.3:
+                    edge_cost *= (1 + edge.flood_risk * 10)
+
+                new_g = g_costs[current_id] + edge_cost
+
+                if neighbor_id not in g_costs or new_g < g_costs[neighbor_id]:
+                    g_costs[neighbor_id] = new_g
+                    counter += 1
+
+                    new_dist = total_dist + edge.length_km
+                    new_time = total_time + edge.current_travel_time
+                    new_risk = max(max_risk, edge.flood_risk)
+
+                    heapq.heappush(open_set, (
+                        new_g, counter, neighbor_id, path + [neighbor_id],
+                        new_dist, new_time, new_risk
+                    ))
+
+        return results
 
     def _find_path_with_metrics(self, zone: PopulationZone, shelter: Shelter) -> tuple:
         """
@@ -283,9 +414,80 @@ class GreyWolfOptimizer(BaseAlgorithm):
                             new_dist, new_time, new_risk
                         ))
 
-        # Không tìm thấy đường - trả về đường chim bay với penalty cao
+        # A* failed - try BFS without hazard avoidance as fallback
+        bfs_result = self._bfs_fallback_path(zone, shelter, zone_node, target_node, shelter_nearest, zone_in_network)
+        if bfs_result:
+            return bfs_result
+
+        # Still no path - return bird route (this should be rare)
         dist = haversine_distance(zone.lat, zone.lon, shelter.lat, shelter.lon)
-        return [zone.id, shelter.id], dist * 2, dist / 15.0, 0.9  # Penalty cho unreachable
+        return [zone.id, shelter.id], dist * 2, dist / 15.0, 0.9
+
+    def _bfs_fallback_path(self, zone: PopulationZone, shelter: Shelter,
+                           zone_node, target_node, shelter_nearest, zone_in_network: bool) -> Optional[tuple]:
+        """
+        BFS fallback khi A* không tìm được đường (do hazard avoidance quá strict).
+        Cho phép đi qua hazard zones nhưng vẫn tính risk đúng.
+
+        Returns:
+            Tuple của (path, distance_km, time_hours, max_risk) hoặc None
+        """
+        from collections import deque
+
+        # BFS với tracking distance, time, risk
+        if zone_in_network:
+            start_entry = (zone_node.id, [zone_node.id], 0.0, 0.0, 0.0)
+        else:
+            start_entry = (zone_node.id, [zone.id, zone_node.id], 0.0, 0.0, 0.0)
+
+        queue = deque([start_entry])
+        visited = {zone_node.id}
+
+        while queue:
+            current_id, path, total_dist, total_time, max_risk = queue.popleft()
+
+            # Cập nhật risk tại node hiện tại
+            current_node = self.network.get_node(current_id)
+            if current_node:
+                node_risk = self.network.get_total_risk_at(current_node.lat, current_node.lon)
+                max_risk = max(max_risk, node_risk)
+
+            # Kiểm tra đến shelter
+            if current_id == shelter.id:
+                return path, total_dist, total_time, max_risk
+
+            # Kiểm tra đến node gần shelter
+            if shelter_nearest and current_id == shelter_nearest.id:
+                edge_to_shelter = self.network.get_edge_between(current_id, shelter.id)
+                if edge_to_shelter and not edge_to_shelter.is_blocked:
+                    final_path = path + [shelter.id]
+                    shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
+                    return (
+                        final_path,
+                        total_dist + edge_to_shelter.length_km,
+                        total_time + edge_to_shelter.current_travel_time,
+                        max(max_risk, edge_to_shelter.flood_risk, shelter_risk)
+                    )
+
+            # Expand neighbors - không skip high risk edges
+            for neighbor_id in self.network.get_neighbors(current_id):
+                if neighbor_id in visited:
+                    continue
+
+                edge = self.network.get_edge_between(current_id, neighbor_id)
+                if not edge or edge.is_blocked:
+                    continue
+
+                visited.add(neighbor_id)
+                queue.append((
+                    neighbor_id,
+                    path + [neighbor_id],
+                    total_dist + edge.length_km,
+                    total_time + edge.current_travel_time,
+                    max(max_risk, edge.flood_risk)
+                ))
+
+        return None  # No path found even with BFS
 
     def _initialize_population(self) -> None:
         """Khởi tạo quần thể sói với các giải pháp ngẫu nhiên."""

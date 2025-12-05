@@ -274,30 +274,47 @@ HCM_SHELTERS: List[ShelterTemplate] = [
 
 # Các khu vực dễ ngập lụt đã biết ở TP.HCM
 # Dựa trên dữ liệu ngập lụt lịch sử
+# Cấu hình: 1 vùng lớn + 3 vùng trung bình = 4 vùng tổng cộng
 FLOOD_PRONE_AREAS: List[Dict] = [
-    # Quận 8 - Dễ ngập lụt nhất
-    {'center_lat': 10.7255, 'center_lon': 106.6373, 'radius_km': 2.5, 'risk': 0.9, 'name': 'District 8 Central'},
+    # 1 VÙNG LỚN - Bao phủ nhiều quận (Quận 8, Quận 6, phần Bình Tân, Quận 11)
+    # Đây là khu vực ngập lụt nghiêm trọng nhất, bao trùm nhiều khu dân cư
+    {
+        'center_lat': 10.7400,  # Giữa Quận 8 và Quận 6
+        'center_lon': 106.6350,
+        'radius_km': 4.5,  # Vùng lớn bao phủ nhiều quận
+        'risk': 0.9,
+        'name': 'Western HCM Flood Zone (Q8-Q6-Binh Tan)'
+    },
 
-    # Nhà Bè - Ngập lụt ven biển
-    {'center_lat': 10.6947, 'center_lon': 106.7378, 'radius_km': 3.0, 'risk': 0.85, 'name': 'Nha Be'},
+    # 2 VÙNG TRUNG BÌNH - Quận 4 (tâm điểm khu dân cư, vùng trũng thấp)
+    # Đặt chính xác tại trung tâm khu dân cư Quận 4
+    {
+        'center_lat': 10.7579,  # Tâm Quận 4
+        'center_lon': 106.7057,
+        'radius_km': 1.8,  # Vùng trung bình
+        'risk': 0.85,
+        'name': 'District 4 Central (Low-lying)'
+    },
 
-    # Quận 7 - Khu vực Phú Mỹ Hưng
-    {'center_lat': 10.7285, 'center_lon': 106.7158, 'radius_km': 2.0, 'risk': 0.75, 'name': 'Phu My Hung'},
+    # 3 VÙNG TRUNG BÌNH - Quận 7 Phú Mỹ Hưng (khu vực ven sông)
+    # Khu đô thị mới nhưng vẫn có nguy cơ ngập do gần sông
+    {
+        'center_lat': 10.7285,
+        'center_lon': 106.7158,
+        'radius_km': 2.2,  # Vùng trung bình
+        'risk': 0.75,
+        'name': 'Phu My Hung Riverside (District 7)'
+    },
 
-    # Quận 4 - Vùng trũng thấp
-    {'center_lat': 10.7579, 'center_lon': 106.7057, 'radius_km': 1.5, 'risk': 0.8, 'name': 'District 4'},
-
-    # Bình Thạnh - Gần sông Sài Gòn
-    {'center_lat': 10.8021, 'center_lon': 106.7212, 'radius_km': 1.5, 'risk': 0.6, 'name': 'Binh Thanh Riverside'},
-
-    # Thủ Đức - Một số khu vực
-    {'center_lat': 10.8614, 'center_lon': 106.7689, 'radius_km': 1.8, 'risk': 0.5, 'name': 'Thu Duc Low Areas'},
-
-    # Quận 6 - Khu vực kênh rạch
-    {'center_lat': 10.7428, 'center_lon': 106.6283, 'radius_km': 1.2, 'risk': 0.65, 'name': 'District 6 Canal'},
-
-    # Bình Tân - Thoát nước khu công nghiệp
-    {'center_lat': 10.7504, 'center_lon': 106.5937, 'radius_km': 2.0, 'risk': 0.55, 'name': 'Binh Tan Industrial'},
+    # 4 VÙNG TRUNG BÌNH - Nhà Bè (ven biển, ngập lụt do triều cường)
+    # Khu vực ven biển dễ bị ngập do triều cường và nước biển dâng
+    {
+        'center_lat': 10.6947,  # Tâm Nhà Bè
+        'center_lon': 106.7378,
+        'radius_km': 2.5,  # Vùng trung bình
+        'risk': 0.8,
+        'name': 'Nha Be Coastal (Tidal Flooding)'
+    },
 ]
 
 

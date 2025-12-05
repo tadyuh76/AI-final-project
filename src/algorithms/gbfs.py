@@ -110,13 +110,15 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         return sum(e.congestion_level for e in edges) / len(edges)
 
     def find_path(self, source: PopulationZone,
-                  shelters: List[Shelter]) -> Tuple[Optional[List[str]], Optional[Shelter], float]:
+                  shelters: List[Shelter],
+                  allow_emergency: bool = False) -> Tuple[Optional[List[str]], Optional[Shelter], float]:
         """
         Tìm đường đi tốt nhất từ một khu vực dân cư đến bất kỳ nơi trú ẩn khả dụng nào.
 
         Args:
             source: Khu vực dân cư xuất phát
             shelters: Danh sách các nơi trú ẩn đích tiềm năng
+            allow_emergency: Cho phép đi qua vùng nguy hiểm cao (cho zones bị kẹt)
 
         Returns:
             Tuple của (đường đi dưới dạng danh sách ID nút, nơi trú ẩn được chọn, tổng chi phí)
@@ -132,7 +134,9 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 continue
             # Check if shelter is in high-risk hazard zone
             shelter_risk = self.network.get_total_risk_at(s.lat, s.lon)
-            if shelter_risk > 0.6:  # Standardized risk threshold (0.6)
+            # In emergency mode, allow shelters in moderate risk areas
+            risk_threshold = 0.8 if allow_emergency else 0.6
+            if shelter_risk > risk_threshold:
                 continue
             available_shelters.append(s)
 
@@ -198,8 +202,12 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 if not edge or edge.is_blocked:
                     continue
 
-                edge_cost = edge.get_cost(self.w_risk)
+                edge_cost = edge.get_cost(self.w_risk, allow_emergency=allow_emergency)
                 new_g_cost = current.g_cost + edge_cost
+
+                # Skip if cost is infinite (blocked edge)
+                if new_g_cost == float('inf'):
+                    continue
 
                 # Lấy nút láng giềng cho heuristic
                 neighbor_node = self.network.get_node(neighbor_id)
@@ -279,8 +287,12 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
             # Continue assigning until zone is fully evacuated or no more shelter capacity
             while zone_remaining[zone.id] >= self.config.min_flow_threshold:
-                # Tìm đường đi cho khu vực này
-                path, shelter, cost = self.find_path(zone, shelters)
+                # Tìm đường đi cho khu vực này (normal mode first)
+                path, shelter, cost = self.find_path(zone, shelters, allow_emergency=False)
+
+                # If no path found, retry with emergency mode (allows traversing high-risk areas)
+                if not path or not shelter:
+                    path, shelter, cost = self.find_path(zone, shelters, allow_emergency=True)
 
                 if not path or not shelter:
                     break
@@ -379,7 +391,8 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
     def find_multiple_paths(self, source: PopulationZone,
                            shelters: List[Shelter],
-                           k: int = 3) -> List[Tuple[List[str], Shelter, float]]:
+                           k: int = 3,
+                           allow_emergency: bool = False) -> List[Tuple[List[str], Shelter, float]]:
         """
         Tìm k đường đi tốt nhất từ nguồn đến các nơi trú ẩn.
 
@@ -389,6 +402,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             source: Khu vực xuất phát
             shelters: Các nơi trú ẩn khả dụng
             k: Số lượng đường đi cần tìm
+            allow_emergency: Cho phép đi qua vùng nguy hiểm cao
 
         Returns:
             Danh sách các tuple (đường đi, nơi trú ẩn, chi phí)
@@ -403,7 +417,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             if not available:
                 break
 
-            path, shelter, cost = self.find_path(source, available)
+            path, shelter, cost = self.find_path(source, available, allow_emergency=allow_emergency)
             if path and shelter:
                 paths.append((path, shelter, cost))
                 used_shelters.add(shelter.id)

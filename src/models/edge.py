@@ -107,12 +107,13 @@ class Edge:
             return float('inf')
         return self.length_km / speed
 
-    def get_cost(self, risk_weight: float = 0.3) -> float:
+    def get_cost(self, risk_weight: float = 0.3, allow_emergency: bool = False) -> float:
         """
         Tính chi phí cạnh cho tìm đường.
 
         Args:
             risk_weight: Trọng số cho rủi ro lũ lụt (0.0 đến 1.0)
+            allow_emergency: Cho phép đi qua vùng nguy hiểm cao (cho sơ tán khẩn cấp)
 
         Returns:
             Chi phí kết hợp xem xét thời gian và rủi ro.
@@ -120,14 +121,24 @@ class Edge:
         if self.is_blocked:
             return float('inf')
 
-        # Block high-risk edges completely (standardized 0.6 threshold)
-        if self.flood_risk > 0.6:
-            return float('inf')
-
         time_cost = self.current_travel_time
 
+        # High-risk edges (> 0.6) are heavily penalized but still passable
+        # This allows evacuation from zones inside hazard areas
+        if self.flood_risk > 0.6:
+            if allow_emergency:
+                # Emergency mode: very high penalty but passable
+                # Risk 0.7 -> 1000x penalty, Risk 0.9 -> 10000x penalty
+                emergency_penalty = 1000.0 * (10.0 ** ((self.flood_risk - 0.6) * 5))
+                return time_cost * emergency_penalty
+            else:
+                # Normal mode: extremely high cost to strongly discourage
+                # but still allow as last resort (not infinity)
+                high_risk_penalty = 1000.0 + (self.flood_risk ** 3) * 10000.0
+                return time_cost * high_risk_penalty
+
         # Exponential penalty for flood risk - makes algorithm strongly avoid hazards
-        # At risk=0.5, penalty is ~26x; at risk=0.7, penalty is ~50x
+        # At risk=0.5, penalty is ~26x; at risk=0.6, penalty is ~37x
         risk_penalty = 1.0 + (self.flood_risk ** 2) * 100.0
 
         return time_cost * risk_penalty

@@ -482,19 +482,37 @@ class GreyWolfOptimizer(BaseAlgorithm):
         import heapq
         from ..models.node import haversine_distance
 
-        # Find nearest network node to zone
-        zone_node = self.network.find_nearest_node(zone.lat, zone.lon)
-        # Find nearest network node to shelter
-        shelter_node = self.network.find_nearest_node(shelter.lat, shelter.lon)
+        # Thử lấy zone node trực tiếp từ mạng (nếu zone được kết nối)
+        zone_in_network = self.network.get_node(zone.id)
+        if zone_in_network:
+            zone_node = zone_in_network
+        else:
+            # Dự phòng: tìm nút gần nhất
+            zone_node = self.network.find_nearest_node(zone.lat, zone.lon)
 
-        if not zone_node or not shelter_node:
+        # Tương tự cho shelter
+        shelter_in_network = self.network.get_node(shelter.id)
+        shelter_nearest = self.network.find_nearest_node(shelter.lat, shelter.lon)
+
+        if not zone_node:
+            return [zone.id, shelter.id]
+
+        # Xác định đích: có thể là shelter trực tiếp hoặc nút gần nhất với shelter
+        target_node = shelter_in_network if shelter_in_network else shelter_nearest
+        if not target_node:
             return [zone.id, shelter.id]
 
         # A* search with hazard avoidance
         # Priority queue: (f_cost, counter, node_id, path)
         counter = 0
-        start_h = haversine_distance(zone_node.lat, zone_node.lon, shelter_node.lat, shelter_node.lon)
-        open_set = [(start_h, counter, zone_node.id, [zone.id, zone_node.id])]
+        start_h = haversine_distance(zone_node.lat, zone_node.lon, target_node.lat, target_node.lon)
+
+        # Bắt đầu từ zone node
+        if zone_in_network:
+            open_set = [(start_h, counter, zone_node.id, [zone_node.id])]
+        else:
+            open_set = [(start_h, counter, zone_node.id, [zone.id, zone_node.id])]
+
         visited = set()
         g_costs = {zone_node.id: 0.0}
 
@@ -505,8 +523,15 @@ class GreyWolfOptimizer(BaseAlgorithm):
                 continue
             visited.add(current_id)
 
-            if current_id == shelter_node.id:
-                return path + [shelter.id]
+            # Kiểm tra nếu đã đến shelter trực tiếp
+            if current_id == shelter.id:
+                return path
+
+            # Kiểm tra nếu đã đến nút gần shelter và có cạnh trực tiếp đến shelter
+            if shelter_nearest and current_id == shelter_nearest.id:
+                edge_to_shelter = self.network.get_edge_between(current_id, shelter.id)
+                if edge_to_shelter and not edge_to_shelter.is_blocked:
+                    return path + [shelter.id]
 
             current_node = self.network.get_node(current_id)
             if not current_node:
@@ -537,7 +562,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
                     neighbor_node = self.network.get_node(neighbor_id)
                     if neighbor_node:
                         h = haversine_distance(neighbor_node.lat, neighbor_node.lon,
-                                              shelter_node.lat, shelter_node.lon)
+                                              target_node.lat, target_node.lon)
                         f = new_g + h
                         counter += 1
                         heapq.heappush(open_set, (f, counter, neighbor_id, path + [neighbor_id]))
@@ -545,12 +570,23 @@ class GreyWolfOptimizer(BaseAlgorithm):
         # Fallback: try BFS without strict hazard avoidance
         from collections import deque
         visited = {zone_node.id}
-        queue = deque([(zone_node.id, [zone.id, zone_node.id])])
+        if zone_in_network:
+            queue = deque([(zone_node.id, [zone_node.id])])
+        else:
+            queue = deque([(zone_node.id, [zone.id, zone_node.id])])
 
         while queue:
             current_id, path = queue.popleft()
-            if current_id == shelter_node.id:
-                return path + [shelter.id]
+
+            # Kiểm tra đã đến shelter
+            if current_id == shelter.id:
+                return path
+
+            # Kiểm tra đã đến nút gần shelter
+            if shelter_nearest and current_id == shelter_nearest.id:
+                edge_to_shelter = self.network.get_edge_between(current_id, shelter.id)
+                if edge_to_shelter and not edge_to_shelter.is_blocked:
+                    return path + [shelter.id]
 
             for neighbor_id in self.network.get_neighbors(current_id):
                 if neighbor_id in visited:

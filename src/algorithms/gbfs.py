@@ -147,17 +147,34 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         if not available_shelters:
             return None, None, float('inf')
 
-        # Tạo tập hợp đích
-        goal_ids = {s.id for s in available_shelters}
-        shelter_map = {s.id: s for s in available_shelters}
+        # Tạo tập hợp đích - sử dụng cả ID shelter và ID nút gần nhất
+        goal_ids = set()
+        shelter_map = {}
+        shelter_nearest_nodes = {}  # Map từ nearest node ID -> shelter
+
+        for s in available_shelters:
+            goal_ids.add(s.id)
+            shelter_map[s.id] = s
+            # Cũng tìm nút gần nhất với shelter để có thể tìm đường qua đó
+            nearest_to_shelter = self.network.find_nearest_node(s.lat, s.lon)
+            if nearest_to_shelter and nearest_to_shelter.id != s.id:
+                shelter_nearest_nodes[nearest_to_shelter.id] = s
 
         # Hàng đợi ưu tiên: (f_cost, counter, SearchNode)
         # Counter để phá vỡ sự ràng buộc tránh so sánh SearchNodes
         counter = 0
         open_set: List[Tuple[float, int, SearchNode]] = []
 
-        # Tìm giao lộ gần nhất với nguồn
-        source_node = self.network.find_nearest_node(source.lat, source.lon)
+        # Bắt đầu từ chính nút zone (nếu zone được kết nối với mạng)
+        # hoặc từ giao lộ gần nhất
+        zone_node = self.network.get_node(source.id)
+        if zone_node:
+            # Zone tồn tại trong mạng, bắt đầu từ đó
+            source_node = zone_node
+        else:
+            # Dự phòng: tìm giao lộ gần nhất với nguồn
+            source_node = self.network.find_nearest_node(source.lat, source.lon)
+
         if not source_node:
             return None, None, float('inf')
 
@@ -187,10 +204,21 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
             # Kiểm tra nếu đã đến đích (nơi trú ẩn)
             if current.node_id in goal_ids:
-                # Tái tạo đường đi
+                # Đã đến trực tiếp shelter node
                 path = self._reconstruct_path(current)
                 shelter = shelter_map[current.node_id]
                 return path, shelter, current.g_cost
+
+            # Kiểm tra nếu đã đến nút gần shelter (shelter có thể không nằm trong đồ thị chính)
+            if current.node_id in shelter_nearest_nodes:
+                shelter = shelter_nearest_nodes[current.node_id]
+                # Kiểm tra xem có cạnh trực tiếp đến shelter không
+                edge_to_shelter = self.network.get_edge_between(current.node_id, shelter.id)
+                if edge_to_shelter and not edge_to_shelter.is_blocked:
+                    path = self._reconstruct_path(current)
+                    path.append(shelter.id)  # Thêm shelter vào cuối đường đi
+                    final_cost = current.g_cost + edge_to_shelter.get_cost(self.w_risk, allow_emergency)
+                    return path, shelter, final_cost
 
             # Mở rộng các láng giềng
             for neighbor_id in self.network.get_neighbors(current.node_id):

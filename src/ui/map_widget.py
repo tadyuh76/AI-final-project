@@ -122,6 +122,10 @@ class PopulationZoneItem(QGraphicsEllipseItem):
         self.setBrush(QBrush(hex_to_qcolor(COLORS.cyan, 200)))
         self.setPen(QPen(hex_to_qcolor(COLORS.cyan_dark), 2))
         self._update_tooltip()
+        # Invalidate cache để cập nhật hiển thị
+        self.setCacheMode(QGraphicsItem.CacheMode.NoCache)
+        self.update()
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
 
 class ShelterItem(QGraphicsRectItem):

@@ -320,6 +320,15 @@ class PerformanceTable(QTableWidget):
             if item:
                 item.setBackground(QBrush(highlight_color))
 
+    def clear_data(self):
+        """Xóa tất cả dữ liệu trong bảng."""
+        for row in range(self.rowCount()):
+            for col in range(1, self.columnCount()):  # Bỏ qua cột chỉ số
+                item = QTableWidgetItem("")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setBackground(QBrush(Qt.GlobalColor.transparent))
+                self.setItem(row, col, item)
+
 
 # =============================================================================
 # BIỂU ĐỒ RADAR
@@ -645,4 +654,5 @@ class ComparisonView(QWidget):
         self.convergence_chart.clear_data()
         self.radar_chart.clear_data()
         self.metric_bar_chart.clear_data()
+        self.performance_table.clear_data()
         self.winner_badge.set_winner("--", 0)

@@ -98,8 +98,12 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             h_capacity = 10.0  # No capacity = high penalty
 
         # Kết hợp với trọng số
+        # Risk penalty được tăng mạnh để tránh đi qua vùng nguy hiểm
+        # risk = 0.5 -> penalty ~25, risk = 0.8 -> penalty ~64
+        risk_penalty = h_risk * h_risk * 100.0  # Exponential penalty for risk
+
         h = (self.w_dist * h_dist +
-             self.w_risk * h_risk * 10.0 +  # Scale risk to be comparable
+             self.w_risk * risk_penalty +
              self.w_congestion * h_congestion * 5.0 +
              self.w_capacity * h_capacity)
 
@@ -243,7 +247,9 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 if not edge or edge.is_blocked:
                     continue
 
-                if not allow_emergency and edge.flood_risk > 0.6:
+                # Skip high-risk edges (> 0.5) unless in emergency mode
+                # This prevents paths from going through hazard zones
+                if not allow_emergency and edge.flood_risk > 0.5:
                     continue
 
                 neighbor_node = self.network.get_node(neighbor_id)

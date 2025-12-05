@@ -419,31 +419,43 @@ HCM_SHELTERS: List[ShelterTemplate] = [
 
 
 # Các khu vực dễ ngập lụt đã biết ở TP.HCM
-# Dựa trên dữ liệu ngập lụt lịch sử
+# 4 vùng nguy hiểm: 1 lớn (4.5km) và 3 trung bình (2-2.5km)
 FLOOD_PRONE_AREAS: List[Dict] = [
-    # Quận 8 - Dễ ngập lụt nhất
-    {'center_lat': 10.7255, 'center_lon': 106.6373, 'radius_km': 2.5, 'risk': 0.9, 'name': 'District 8 Central'},
+    # VÙNG LỚN: Quận 8, 6, 4, 7 - Khu vực trũng phía Nam (bao phủ nhiều quận)
+    {
+        'center_lat': 10.7350,
+        'center_lon': 106.6700,
+        'radius_km': 4.5,
+        'risk': 0.85,
+        'name': 'Southern Lowlands'
+    },
 
-    # Nhà Bè - Ngập lụt ven biển
-    {'center_lat': 10.6947, 'center_lon': 106.7378, 'radius_km': 3.0, 'risk': 0.85, 'name': 'Nha Be'},
+    # VÙNG TRUNG BÌNH 1: Nhà Bè - Ngập lụt ven biển phía cực Nam
+    {
+        'center_lat': 10.6900,
+        'center_lon': 106.7400,
+        'radius_km': 2.5,
+        'risk': 0.9,
+        'name': 'Nha Be Coastal'
+    },
 
-    # Quận 7 - Khu vực Phú Mỹ Hưng
-    {'center_lat': 10.7285, 'center_lon': 106.7158, 'radius_km': 2.0, 'risk': 0.75, 'name': 'Phu My Hung'},
+    # VÙNG TRUNG BÌNH 2: Bình Tân - Khu công nghiệp thoát nước kém
+    {
+        'center_lat': 10.7450,
+        'center_lon': 106.5950,
+        'radius_km': 2.0,
+        'risk': 0.7,
+        'name': 'Binh Tan Industrial'
+    },
 
-    # Quận 4 - Vùng trũng thấp
-    {'center_lat': 10.7579, 'center_lon': 106.7057, 'radius_km': 1.5, 'risk': 0.8, 'name': 'District 4'},
-
-    # Bình Thạnh - Gần sông Sài Gòn
-    {'center_lat': 10.8021, 'center_lon': 106.7212, 'radius_km': 1.5, 'risk': 0.6, 'name': 'Binh Thanh Riverside'},
-
-    # Thủ Đức - Một số khu vực
-    {'center_lat': 10.8614, 'center_lon': 106.7689, 'radius_km': 1.8, 'risk': 0.5, 'name': 'Thu Duc Low Areas'},
-
-    # Quận 6 - Khu vực kênh rạch
-    {'center_lat': 10.7428, 'center_lon': 106.6283, 'radius_km': 1.2, 'risk': 0.65, 'name': 'District 6 Canal'},
-
-    # Bình Tân - Thoát nước khu công nghiệp
-    {'center_lat': 10.7504, 'center_lon': 106.5937, 'radius_km': 2.0, 'risk': 0.55, 'name': 'Binh Tan Industrial'},
+    # VÙNG TRUNG BÌNH 3: Thủ Đức Đông - Gần sông Đồng Nai
+    {
+        'center_lat': 10.8550,
+        'center_lon': 106.7850,
+        'radius_km': 2.0,
+        'risk': 0.6,
+        'name': 'Thu Duc Riverside'
+    },
 ]
 
 

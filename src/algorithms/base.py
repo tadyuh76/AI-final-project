@@ -173,11 +173,11 @@ class BaseAlgorithm(ABC):
 @dataclass
 class AlgorithmConfig:
     """Cấu hình cho các tham số thuật toán."""
-    # Trọng số GBFS (rebalanced for better shelter distribution)
-    distance_weight: float = 0.35
-    risk_weight: float = 0.25
-    congestion_weight: float = 0.15
-    capacity_weight: float = 0.25  # Increased from 0.1 to prioritize shelter capacity
+    # Trọng số GBFS (phải khớp với UI control_panel.py)
+    distance_weight: float = 0.4
+    risk_weight: float = 0.3
+    congestion_weight: float = 0.2
+    capacity_weight: float = 0.1
 
     # Tham số GWO
     n_wolves: int = 30

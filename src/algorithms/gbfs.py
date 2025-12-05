@@ -25,18 +25,12 @@ from ..models.node import Node, PopulationZone, Shelter, haversine_distance
 class SearchNode:
     """Nút trong cây tìm kiếm GBFS."""
     node_id: str
-    g_cost: float  # Chi phí thực tế từ điểm bắt đầu
-    h_cost: float  # Chi phí heuristic đến đích
+    h_cost: float  # Chi phí heuristic đến đích (GBFS chỉ dùng h, không dùng g)
     parent: Optional['SearchNode'] = None
 
-    @property
-    def f_cost(self) -> float:
-        """Tổng chi phí ước tính (với GBFS, chủ yếu sử dụng h_cost)."""
-        return self.h_cost
-
     def __lt__(self, other: 'SearchNode') -> bool:
-        """So sánh cho hàng đợi ưu tiên (f_cost thấp hơn là tốt hơn)."""
-        return self.f_cost < other.f_cost
+        """So sánh cho hàng đợi ưu tiên (h_cost thấp hơn là tốt hơn)."""
+        return self.h_cost < other.h_cost
 
 
 class GreedyBestFirstSearch(BaseAlgorithm):
@@ -68,39 +62,45 @@ class GreedyBestFirstSearch(BaseAlgorithm):
     def algorithm_type(self) -> AlgorithmType:
         return AlgorithmType.GBFS
 
-    def heuristic(self, node: Node, goal: Shelter, current_flow: Dict[str, int]) -> float:
+    def heuristic(self, node: Node, goal: Shelter) -> float:
         """
-        Tính giá trị heuristic đa mục tiêu.
+        Tính giá trị heuristic đa mục tiêu cho GBFS.
 
-        Giá trị thấp hơn là tốt hơn.
+        Kết hợp 4 yếu tố:
+        - Khoảng cách đến shelter
+        - Rủi ro tại vị trí hiện tại
+        - Tắc nghẽn giao thông
+        - Sức chứa còn lại của shelter
 
         Args:
             node: Nút hiện tại
             goal: Nơi trú ẩn đích
-            current_flow: Luồng hiện tại trên mỗi cạnh
 
         Returns:
-            Ước tính chi phí heuristic
+            Giá trị heuristic (thấp hơn là tốt hơn)
         """
-        # Thành phần khoảng cách (chuẩn hóa theo khoảng cách tối đa điển hình ~30km)
-        h_dist = haversine_distance(node.lat, node.lon, goal.lat, goal.lon) / 30.0
+        # 1. Khoảng cách đến shelter (km)
+        h_dist = haversine_distance(node.lat, node.lon, goal.lat, goal.lon)
 
-        # Thành phần rủi ro (từ các vùng nguy hiểm)
+        # 2. Rủi ro tại vị trí hiện tại (0-1)
         h_risk = self.network.get_total_risk_at(node.lat, node.lon)
 
-        # Thành phần tắc nghẽn (mức độ tắc nghẽn trung bình của các cạnh gần nút này)
+        # 3. Tắc nghẽn cục bộ (0-1)
         h_congestion = self._get_local_congestion(node.id)
 
-        # Thành phần sức chứa (ưu tiên các nơi trú ẩn có nhiều sức chứa còn lại hơn)
-        # Đảo ngược để giá trị thấp hơn là tốt hơn
-        capacity_ratio = goal.occupancy_rate if goal.capacity > 0 else 1.0
-        h_capacity = capacity_ratio
+        # 4. Penalty cho shelter gần đầy (0-10)
+        if goal.capacity > 0:
+            h_capacity = goal.occupancy_rate * 5.0  # 0-5 based on fullness
+        else:
+            h_capacity = 10.0  # No capacity = high penalty
 
         # Kết hợp với trọng số
-        return (self.w_dist * h_dist +
-                self.w_risk * h_risk +
-                self.w_congestion * h_congestion +
-                self.w_capacity * h_capacity)
+        h = (self.w_dist * h_dist +
+             self.w_risk * h_risk * 10.0 +  # Scale risk to be comparable
+             self.w_congestion * h_congestion * 5.0 +
+             self.w_capacity * h_capacity)
+
+        return h
 
     def _get_local_congestion(self, node_id: str) -> float:
         """Lấy mức độ tắc nghẽn trung bình của các cạnh kết nối với một nút."""
@@ -181,15 +181,13 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         # Khởi tạo với nút nguồn
         start = SearchNode(
             node_id=source_node.id,
-            g_cost=0.0,
-            h_cost=min(self.heuristic(source_node, s, {}) for s in available_shelters)
+            h_cost=min(self.heuristic(source_node, s) for s in available_shelters)
         )
-        heapq.heappush(open_set, (start.f_cost, counter, start))
+        heapq.heappush(open_set, (start.h_cost, counter, start))
         counter += 1
 
         # Tập hợp đã thăm
         visited: Set[str] = set()
-        current_flow: Dict[str, int] = {}
 
         while open_set:
             if self._should_stop:
@@ -207,7 +205,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 # Đã đến trực tiếp shelter node
                 path = self._reconstruct_path(current)
                 shelter = shelter_map[current.node_id]
-                return path, shelter, current.g_cost
+                return path, shelter, current.h_cost
 
             # Kiểm tra nếu đã đến nút gần shelter (shelter có thể không nằm trong đồ thị chính)
             if current.node_id in shelter_nearest_nodes:
@@ -217,24 +215,20 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 if edge_to_shelter and not edge_to_shelter.is_blocked:
                     path = self._reconstruct_path(current)
                     path.append(shelter.id)  # Thêm shelter vào cuối đường đi
-                    final_cost = current.g_cost + edge_to_shelter.get_cost(self.w_risk, allow_emergency)
-                    return path, shelter, final_cost
+                    return path, shelter, current.h_cost
 
             # Mở rộng các láng giềng
             for neighbor_id in self.network.get_neighbors(current.node_id):
                 if neighbor_id in visited:
                     continue
 
-                # Lấy chi phí cạnh
+                # Kiểm tra cạnh có hợp lệ không
                 edge = self.network.get_edge_between(current.node_id, neighbor_id)
                 if not edge or edge.is_blocked:
                     continue
 
-                edge_cost = edge.get_cost(self.w_risk, allow_emergency=allow_emergency)
-                new_g_cost = current.g_cost + edge_cost
-
-                # Skip if cost is infinite (blocked edge)
-                if new_g_cost == float('inf'):
+                # Kiểm tra rủi ro cạnh (block high-risk edges unless emergency)
+                if not allow_emergency and edge.flood_risk > 0.6:
                     continue
 
                 # Lấy nút láng giềng cho heuristic
@@ -242,20 +236,20 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 if not neighbor_node:
                     continue
 
-                # Tính heuristic đến nơi trú ẩn gần nhất
+                # Tính heuristic đa mục tiêu đến shelter tốt nhất
+                # GBFS thuần túy: chỉ dùng h(n), không dùng g(n)
                 h_cost = min(
-                    self.heuristic(neighbor_node, s, current_flow)
+                    self.heuristic(neighbor_node, s)
                     for s in available_shelters
                 )
 
                 neighbor = SearchNode(
                     node_id=neighbor_id,
-                    g_cost=new_g_cost,
                     h_cost=h_cost,
                     parent=current
                 )
 
-                heapq.heappush(open_set, (neighbor.f_cost, counter, neighbor))
+                heapq.heappush(open_set, (neighbor.h_cost, counter, neighbor))
                 counter += 1
 
         return None, None, float('inf')

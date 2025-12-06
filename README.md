@@ -222,10 +222,10 @@ python -m pytest tests/test_simulation.py -v
 
 ## Tác Giả
 
-- **tadyuh76** - Trưởng nhóm, Kiến trúc hệ thống
-- **ayo-lole** - Phát triển thuật toán
-- **PeanLutHuynh** - Giao diện người dùng
-- **Leon2285** - Dữ liệu và kiểm thử
+- **tadyuh76** - Trưởng nhóm, Kiến trúc hệ thống, Phát triển hệ thống
+- **ayo-lole** - Phát triển giao diện
+- **PeanLutHuynh** - Phát triển demo, config simulation
+- **Leon2285** - Phân tích dữ liệu, so sánh thuật toán
 
 ## Giấy Phép
 

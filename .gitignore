@@ -102,3 +102,4 @@ assets/data/hcm_network.json
 # OSM cache (can be large)
 cache/
 osmnx_cache/
+report/

@@ -4,7 +4,7 @@ SafeRoute HCM - Tối ưu Hoá Sơ tán Bão
 =====================================
 
 Ứng dụng AI cho việc tối ưu hoá tuyến đường sơ tán bão tại Thành phố Hồ Chí Minh
-sử dụng thuật toán Hybrid GBFS + Grey Wolf Optimizer (GWO) với trực quan hoá
+sử dụng thuật toán GBFS + Grey Wolf Optimizer (GWO) với trực quan hoá
 thời gian thực.
 
 Cách chạy:
@@ -91,7 +91,7 @@ def run_cli():
     print(f"  Tổng dân số: {stats.total_population:,}")
     print(f"  Tổng sức chứa: {stats.total_shelter_capacity:,}")
 
-    # Chạy so sánh các thuật toán tối ưu hoá (GBFS, GWO, Hybrid)
+    # Chạy so sánh các thuật toán tối ưu hoá (GBFS, GWO)
     print("\nĐang chạy so sánh thuật toán...")
     config = AlgorithmConfig(
         n_wolves=30,

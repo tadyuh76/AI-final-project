@@ -325,7 +325,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
     def _compute_actual_path_costs(self) -> None:
         """
         Tính chi phí thực tế bằng cách tìm đường qua mạng lưới.
-        Chậm hơn nhưng chính xác hơn nhiều cho Hybrid algorithm.
+        Chậm hơn nhưng chính xác hơn nhiều.
 
         Tối ưu: Sử dụng single-source Dijkstra cho mỗi zone thay vì A* riêng biệt.
         """
@@ -807,7 +807,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
 
         Args:
             use_actual_paths: Nếu True, tính toán khoảng cách thực tế qua mạng lưới.
-                              Chậm hơn nhưng chính xác hơn cho Hybrid algorithm.
+                              Chậm hơn nhưng chính xác hơn.
 
         Returns:
             Tuple của (EvacuationPlan, AlgorithmMetrics)

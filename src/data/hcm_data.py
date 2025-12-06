@@ -419,7 +419,7 @@ HCM_SHELTERS: List[ShelterTemplate] = [
 
 
 # Các khu vực dễ ngập lụt đã biết ở TP.HCM
-# 4 vùng nguy hiểm: 1 lớn (4.5km) và 3 trung bình (2-2.5km)
+# 6 vùng nguy hiểm: 1 lớn (4.5km) và 5 trung bình (1.5-2.5km)
 FLOOD_PRONE_AREAS: List[Dict] = [
     # VÙNG LỚN: Quận 8, 6, 4, 7 - Khu vực trũng phía Nam (bao phủ nhiều quận)
     {
@@ -455,6 +455,24 @@ FLOOD_PRONE_AREAS: List[Dict] = [
         'radius_km': 2.0,
         'risk': 0.6,
         'name': 'Thu Duc Riverside'
+    },
+
+    # VÙNG TRUNG BÌNH 4: Bình Thạnh - Gần sông Sài Gòn
+    {
+        'center_lat': 10.8100,
+        'center_lon': 106.7200,
+        'radius_km': 1.5,
+        'risk': 0.65,
+        'name': 'Binh Thanh Riverside'
+    },
+
+    # VÙNG TRUNG BÌNH 5: Quận 12 - Khu vực trũng phía Bắc
+    {
+        'center_lat': 10.8600,
+        'center_lon': 106.6300,
+        'radius_km': 1.8,
+        'risk': 0.55,
+        'name': 'District 12 Lowlands'
     },
 ]
 

@@ -229,11 +229,10 @@ python -m pytest tests/test_simulation.py -v
 
 ## Giấy Phép
 
-Dự án này được phát triển cho mục đích học tập tại Trường Đại học Kinh tế TP.HCM (UEH).
+Dự án này được phát triển cho mục đích học tập tại Đại học Kinh tế TP.HCM (UEH).
 
 ## Tài Liệu Tham Khảo
 
-- Báo cáo chi tiết: [REPORT.md](REPORT.md)
 - NetworkX Documentation: https://networkx.org/
 - PyQt6 Documentation: https://www.riverbankcomputing.com/static/Docs/PyQt6/
 - Grey Wolf Optimizer: Mirjalili et al. (2014)

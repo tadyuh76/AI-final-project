@@ -42,7 +42,7 @@ geopandas>=0.14.0     # Xử lý dữ liệu địa lý
 
 ### 1. Clone dự án
 ```bash
-git clone <repository-url>
+git clone https://github.com/tadyuh76/AI-final-project
 cd final
 ```
 

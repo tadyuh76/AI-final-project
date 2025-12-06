@@ -11,10 +11,8 @@ import time
 
 class AlgorithmType(Enum):
     """Các loại thuật toán khả dụng."""
-    ASTAR = "astar"  # A* - tối ưu với f(n) = g(n) + h(n)
-    GBFS = "gbfs"    # Greedy Best-First Search - chỉ h(n)
-    GWO = "gwo"      # Grey Wolf Optimizer
-    HYBRID = "hybrid"  # Hybrid GBFS + GWO
+    GBFS = "gbfs"
+    GWO = "gwo"
 
 
 @dataclass
@@ -175,20 +173,16 @@ class BaseAlgorithm(ABC):
 @dataclass
 class AlgorithmConfig:
     """Cấu hình cho các tham số thuật toán."""
-    # Trọng số GBFS (rebalanced for better shelter distribution)
-    distance_weight: float = 0.35
-    risk_weight: float = 0.25
-    congestion_weight: float = 0.15
-    capacity_weight: float = 0.25  # Increased from 0.1 to prioritize shelter capacity
+    # Trọng số GBFS (phải khớp với UI control_panel.py)
+    distance_weight: float = 0.4
+    risk_weight: float = 0.3
+    congestion_weight: float = 0.2
+    capacity_weight: float = 0.1
 
     # Tham số GWO
     n_wolves: int = 30
     max_iterations: int = 100
     a_initial: float = 2.0  # Tham số khám phá
-
-    # Tham số Hybrid
-    gwo_iterations: int = 50
-    refinement_iterations: int = 20
 
     # Chung
     min_flow_threshold: int = 20  # Lowered from 100 to avoid dropping small valid assignments
@@ -204,8 +198,6 @@ class AlgorithmConfig:
             'n_wolves': self.n_wolves,
             'max_iterations': self.max_iterations,
             'a_initial': self.a_initial,
-            'gwo_iterations': self.gwo_iterations,
-            'refinement_iterations': self.refinement_iterations,
             'min_flow_threshold': self.min_flow_threshold,
             'min_zone_risk_for_evacuation': self.min_zone_risk_for_evacuation
         }

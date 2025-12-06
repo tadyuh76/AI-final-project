@@ -4,18 +4,18 @@ Tích hợp tất cả các thành phần UI và xử lý logic ứng dụng.
 """
 
 import sys
+import random
 from typing import Optional, Dict, Any
-from threading import Thread
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QSplitter, QStatusBar, QLabel,
-    QMessageBox, QApplication, QFrame
+    QTabWidget, QStatusBar, QLabel,
+    QMessageBox, QApplication
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot
-from PyQt6.QtGui import QFont, QCloseEvent
+from PyQt6.QtCore import pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtGui import QCloseEvent
 
-from .styles import COLORS, MAIN_STYLESHEET, Sizes, hex_to_rgb
+from .styles import MAIN_STYLESHEET, Sizes, hex_to_rgb
 from .map_widget import MapWidget
 from .control_panel import ControlPanel
 from .dashboard import Dashboard
@@ -25,13 +25,11 @@ from ..models.network import EvacuationNetwork
 from ..algorithms.base import AlgorithmConfig, AlgorithmType, EvacuationPlan
 from ..algorithms.gbfs import GreedyBestFirstSearch
 from ..algorithms.gwo import GreyWolfOptimizer
-from ..algorithms.hybrid import HybridGBFSGWO
 from ..algorithms.comparator import AlgorithmComparator, ComparisonResult
 from ..simulation.engine import SimulationEngine, SimulationConfig, SimulationMetrics
-import random
-from ..data.hcm_data import HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS
+from ..data.hcm_data import HCM_BOUNDS
 from ..models.node import HazardZone
-from ..data.osm_loader import OSMDataLoader, load_network
+from ..data.osm_loader import OSMDataLoader
 
 
 def hex_to_qcolor(hex_color: str, alpha: int = 255):
@@ -51,7 +49,7 @@ class OptimizationWorker(QThread):
     error_occurred = pyqtSignal(str)
 
     def __init__(self, network: EvacuationNetwork, config: AlgorithmConfig,
-                 algorithm_type: str = 'hybrid', compare_all: bool = False):
+                 algorithm_type: str = 'gbfs', compare_all: bool = False):
         super().__init__()
         self.network = network
         self.config = config
@@ -72,15 +70,13 @@ class OptimizationWorker(QThread):
     def _run_single_algorithm(self):
         """Chạy một thuật toán duy nhất."""
         # Create algorithm
-        if self.algorithm_type == 'gbfs':
-            algorithm = GreedyBestFirstSearch(self.network, self.config)
-            algo_type = AlgorithmType.GBFS
-        elif self.algorithm_type == 'gwo':
+        if self.algorithm_type == 'gwo':
             algorithm = GreyWolfOptimizer(self.network, self.config)
             algo_type = AlgorithmType.GWO
         else:
-            algorithm = HybridGBFSGWO(self.network, self.config)
-            algo_type = AlgorithmType.HYBRID
+            # Default to GBFS
+            algorithm = GreedyBestFirstSearch(self.network, self.config)
+            algo_type = AlgorithmType.GBFS
 
         # Set progress callback
         def progress_callback(iteration: int, cost: float, data: Any):
@@ -284,7 +280,7 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.fps_label)
 
         # Algorithm label
-        self.algo_label = QLabel("Hybrid GBFS+GWO")
+        self.algo_label = QLabel("GBFS")
         self.status_bar.addPermanentWidget(self.algo_label)
 
         # Iteration label
@@ -460,8 +456,7 @@ class MainWindow(QMainWindow):
         # Update algorithm label
         algo_names = {
             'gbfs': 'GBFS',
-            'gwo': 'GWO',
-            'hybrid': 'Hybrid GBFS+GWO'
+            'gwo': 'GWO'
         }
         self.algo_label.setText(algo_names.get(algorithm, algorithm))
         self.status_label.setText(f"Đã chọn thuật toán: {algo_names.get(algorithm, algorithm)}")

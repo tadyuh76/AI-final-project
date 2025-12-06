@@ -1,6 +1,6 @@
 """
 Kiểm thử đơn vị cho module algorithms.
-Kiểm thử các thuật toán GBFS, GWO, Hybrid và Comparator.
+Kiểm thử các thuật toán GBFS, GWO và Comparator.
 """
 
 import pytest
@@ -11,16 +11,15 @@ import numpy as np
 # Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from src.models.node import Node, PopulationZone, Shelter, HazardZone
 from src.models.edge import Edge, RoadType
 from src.models.network import EvacuationNetwork
 from src.algorithms.base import (
     AlgorithmType, AlgorithmConfig, EvacuationRoute,
-    EvacuationPlan, AlgorithmMetrics, BaseAlgorithm
+    EvacuationPlan, AlgorithmMetrics
 )
 from src.algorithms.gbfs import GreedyBestFirstSearch, SearchNode
 from src.algorithms.gwo import GreyWolfOptimizer, Wolf
-from src.algorithms.hybrid import HybridGBFSGWO
 from src.algorithms.comparator import AlgorithmComparator, ComparisonResult
 
 
@@ -120,10 +119,11 @@ class TestAlgorithmConfig:
     def test_default_values(self):
         """Kiểm tra các giá trị cấu hình mặc định."""
         config = AlgorithmConfig()
-        # Updated weights for better shelter distribution
-        assert config.distance_weight == 0.35
-        assert config.risk_weight == 0.25
-        assert config.capacity_weight == 0.25  # Increased from 0.1
+        # Weights matching UI control_panel.py
+        assert config.distance_weight == 0.4
+        assert config.risk_weight == 0.3
+        assert config.congestion_weight == 0.2
+        assert config.capacity_weight == 0.1
         assert config.min_flow_threshold == 20  # Lowered from 100
         assert config.n_wolves == 30
         assert config.max_iterations == 100
@@ -256,7 +256,7 @@ class TestAlgorithmMetrics:
         )
         data = metrics.to_dict()
         assert data['algorithm'] == 'gbfs'
-        assert data['execution_time'] == 1.5
+        assert data['execution_time_seconds'] == 1.5
 
 
 # ==================== Kiểm Thử GBFS ====================
@@ -266,14 +266,14 @@ class TestSearchNode:
 
     def test_search_node_creation(self):
         """Kiểm tra tạo node tìm kiếm."""
-        node = SearchNode(node_id="n1", g_cost=1.0, h_cost=2.0)
+        node = SearchNode(node_id="n1", h_cost=2.0)
         assert node.node_id == "n1"
-        assert node.f_cost == 2.0  # GBFS dùng h_cost cho độ ưu tiên
+        assert node.h_cost == 2.0  # GBFS chỉ dùng h_cost
 
     def test_search_node_comparison(self):
         """Kiểm tra so sánh node tìm kiếm cho hàng đợi ưu tiên."""
-        node1 = SearchNode(node_id="n1", g_cost=1.0, h_cost=2.0)
-        node2 = SearchNode(node_id="n2", g_cost=1.0, h_cost=3.0)
+        node1 = SearchNode(node_id="n1", h_cost=2.0)
+        node2 = SearchNode(node_id="n2", h_cost=3.0)
         assert node1 < node2  # h_cost thấp hơn nên "nhỏ hơn"
 
 
@@ -293,7 +293,8 @@ class TestGreedyBestFirstSearch:
 
         node = network.get_node("n1")
         shelter = network.get_shelters()[0]
-        h = gbfs.heuristic(node, shelter, {})
+        # heuristic(node, goal, node_risk, node_congestion)
+        h = gbfs.heuristic(node, shelter, 0.0, 0.0)
         assert h >= 0  # Heuristic phải không âm
 
     def test_find_path_simple(self):
@@ -475,72 +476,6 @@ class TestGreyWolfOptimizer:
                                      len(network.get_shelters()))
 
 
-# ==================== Kiểm Thử Thuật Toán Hybrid ====================
-
-class TestHybridGBFSGWO:
-    """Kiểm thử cho thuật toán Hybrid."""
-
-    def test_algorithm_type(self):
-        """Kiểm tra thuộc tính loại thuật toán."""
-        network = create_simple_network()
-        hybrid = HybridGBFSGWO(network)
-        assert hybrid.algorithm_type == AlgorithmType.HYBRID
-
-    def test_optimize_creates_plan(self):
-        """Kiểm tra optimize tạo kế hoạch hợp lệ."""
-        network = create_simple_network()
-        config = AlgorithmConfig(
-            n_wolves=10,
-            gwo_iterations=10,
-            refinement_iterations=5
-        )
-        hybrid = HybridGBFSGWO(network, config)
-
-        plan, metrics = hybrid.optimize()
-
-        assert plan is not None
-        assert metrics.execution_time_seconds >= 0
-
-    def test_hybrid_uses_both_algorithms(self):
-        """Kiểm tra hybrid sử dụng cả GWO và GBFS."""
-        network = create_simple_network()
-        config = AlgorithmConfig(
-            n_wolves=5,
-            gwo_iterations=5,
-            refinement_iterations=2
-        )
-        hybrid = HybridGBFSGWO(network, config)
-
-        plan, _ = hybrid.optimize()
-
-        # Hybrid nên tạo đường đi thực tế (không chỉ khu dân cư->nơi trú ẩn)
-        for route in plan.routes:
-            # Đường từ hybrid nên có các node trung gian
-            # (khác với GWO thuần chỉ có điểm đầu/cuối)
-            if route.path:
-                assert len(route.path) >= 2
-
-    def test_progress_callback(self):
-        """Kiểm tra callback tiến độ được gọi."""
-        network = create_simple_network()
-        config = AlgorithmConfig(
-            n_wolves=5,
-            gwo_iterations=5,
-            refinement_iterations=2
-        )
-        hybrid = HybridGBFSGWO(network, config)
-
-        progress_updates = []
-
-        def callback(iteration, cost, data):
-            progress_updates.append((iteration, cost))
-
-        hybrid.set_progress_callback(callback)
-        hybrid.optimize()
-
-        assert len(progress_updates) > 0
-
-
 # ==================== Kiểm Thử Comparator ====================
 
 class TestComparisonResult:
@@ -592,18 +527,15 @@ class TestAlgorithmComparator:
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=5,
-            max_iterations=5,
-            gwo_iterations=5,
-            refinement_iterations=2
+            max_iterations=5
         )
         comparator = AlgorithmComparator(network, config)
 
         result = comparator.compare_all()
 
-        assert len(result.algorithms) == 3
+        assert len(result.algorithms) == 2
         assert AlgorithmType.GBFS in result.metrics
         assert AlgorithmType.GWO in result.metrics
-        assert AlgorithmType.HYBRID in result.metrics
         assert result.winner is not None
 
     def test_rankings_calculated(self):
@@ -615,7 +547,7 @@ class TestAlgorithmComparator:
         result = comparator.compare([AlgorithmType.GBFS, AlgorithmType.GWO])
 
         assert len(result.rankings) > 0
-        assert 'execution_time' in result.rankings
+        assert 'execution_time_seconds' in result.rankings
 
     def test_generate_comparison_table(self):
         """Kiểm tra tạo bảng so sánh."""
@@ -641,15 +573,12 @@ class TestAlgorithmIntegration:
         network = create_simple_network()
         config = AlgorithmConfig(
             n_wolves=10,
-            max_iterations=10,
-            gwo_iterations=10,
-            refinement_iterations=5
+            max_iterations=10
         )
 
         algorithms = [
             GreedyBestFirstSearch(network, config),
-            GreyWolfOptimizer(network, config),
-            HybridGBFSGWO(network, config)
+            GreyWolfOptimizer(network, config)
         ]
 
         for algo in algorithms:

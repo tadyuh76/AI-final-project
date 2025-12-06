@@ -1,23 +1,21 @@
 """
 Bộ so sánh thuật toán để đánh giá và so sánh các thuật toán sơ tán.
 
-Cung cấp so sánh song song của các thuật toán A*, GBFS, GWO và Hybrid
+Cung cấp so sánh song song của các thuật toán GBFS và GWO
 với các chỉ số chi tiết và dữ liệu trực quan hóa.
 """
 
-from typing import Dict, List, Optional, Tuple, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Tuple
 from dataclasses import dataclass, field
-import time
 import json
 
 from .base import (
     BaseAlgorithm, AlgorithmType, AlgorithmConfig,
-    EvacuationPlan, AlgorithmMetrics, ProgressCallback
+    EvacuationPlan, AlgorithmMetrics
 )
 from .astar import AStarSearch
 from .gbfs import GreedyBestFirstSearch
 from .gwo import GreyWolfOptimizer
-from .hybrid import HybridGBFSGWO
 from ..models.network import EvacuationNetwork
 
 
@@ -103,17 +101,12 @@ class AlgorithmComparator:
 
     def compare_all(self) -> ComparisonResult:
         """
-        Chạy tất cả bốn thuật toán và so sánh kết quả.
+        Chạy cả hai thuật toán và so sánh kết quả.
 
         Returns:
             ComparisonResult với tất cả các chỉ số và xếp hạng
         """
-        return self.compare([
-            AlgorithmType.ASTAR,   # A* - baseline tối ưu
-            AlgorithmType.GBFS,    # Greedy Best-First Search
-            AlgorithmType.GWO,     # Grey Wolf Optimizer
-            AlgorithmType.HYBRID   # Hybrid GBFS + GWO
-        ])
+        return self.compare([AlgorithmType.GBFS, AlgorithmType.GWO])
 
     def compare(self, algorithms: List[AlgorithmType]) -> ComparisonResult:
         """
@@ -166,8 +159,6 @@ class AlgorithmComparator:
             return GreedyBestFirstSearch(self.network, self.config)
         elif algo_type == AlgorithmType.GWO:
             return GreyWolfOptimizer(self.network, self.config)
-        elif algo_type == AlgorithmType.HYBRID:
-            return HybridGBFSGWO(self.network, self.config)
         else:
             raise ValueError(f"Loại thuật toán không xác định: {algo_type}")
 
@@ -287,8 +278,7 @@ class AlgorithmComparator:
         """
         all_metrics: Dict[AlgorithmType, List[AlgorithmMetrics]] = {
             AlgorithmType.GBFS: [],
-            AlgorithmType.GWO: [],
-            AlgorithmType.HYBRID: []
+            AlgorithmType.GWO: []
         }
 
         for run in range(n_runs):
@@ -338,10 +328,10 @@ class AlgorithmComparator:
         lines.append("=" * 90)
         lines.append("")
 
-        # Tiêu đề - bao gồm A*
-        header = f"{'Chỉ số':<25} | {'A*':>12} | {'GBFS':>12} | {'GWO':>12} | {'Hybrid':>12}"
+        # Tiêu đề
+        header = f"{'Chỉ số':<25} | {'GBFS':>12} | {'GWO':>12}"
         lines.append(header)
-        lines.append("-" * 90)
+        lines.append("-" * 55)
 
         # Các chỉ số
         metrics_display = [
@@ -359,7 +349,7 @@ class AlgorithmComparator:
 
         for display_name, attr_name, fmt in metrics_display:
             values = []
-            for algo in algo_order:
+            for algo in [AlgorithmType.GBFS, AlgorithmType.GWO]:
                 m = result.metrics.get(algo)
                 if m:
                     val = getattr(m, attr_name, 0)
@@ -372,7 +362,7 @@ class AlgorithmComparator:
                 else:
                     values.append("N/A")
 
-            line = f"{display_name:<25} | {values[0]:>12} | {values[1]:>12} | {values[2]:>12} | {values[3]:>12}"
+            line = f"{display_name:<25} | {values[0]:>12} | {values[1]:>12}"
             lines.append(line)
 
         lines.append("-" * 90)

@@ -1,6 +1,6 @@
 """
-Giao dien nguoi dung cho SafeRoute HCM.
-Cung cap cac widget PyQt6 cho truc quan hoa va dieu khien mo phong so tan.
+Giao diện người dùng cho SafeRoute HCM.
+Cung cấp các widget PyQt6 cho trực quan hóa và điều khiển mô phỏng sơ tán.
 """
 
 from .styles import (

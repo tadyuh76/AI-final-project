@@ -3,8 +3,8 @@ Mô hình đồ thị mạng lưới cho hệ thống sơ tán.
 Bao bọc đồ thị NetworkX với chức năng chuyên biệt cho lĩnh vực.
 """
 
-from typing import Dict, List, Optional, Tuple, Iterator, Set
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Iterator
+from dataclasses import dataclass
 import json
 
 try:
@@ -16,7 +16,7 @@ except ImportError:
 
 from .node import (
     Node, NodeType, PopulationZone, Shelter, HazardZone,
-    haversine_distance, lat_lon_to_mercator
+    haversine_distance
 )
 from .edge import Edge, RoadType
 

@@ -7,7 +7,7 @@ from typing import Optional, Dict, List, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QFrame, QTableWidget, QTableWidgetItem,
-    QHeaderView, QSplitter, QGridLayout
+    QHeaderView, QGridLayout
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush
@@ -44,8 +44,7 @@ class ConvergenceChart(QWidget):
         self._colors = {
             'astar': COLORS.warning,  # Orange for A* (optimal baseline)
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
         self._setup_ui()
@@ -145,8 +144,7 @@ class MetricBarChart(QWidget):
         self._colors = {
             'astar': COLORS.warning,  # Orange for A* (optimal baseline)
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
         self._setup_ui()
@@ -195,7 +193,7 @@ class MetricBarChart(QWidget):
         self.plot_widget.clear()
         self.plot_widget.setTitle(f'So sánh {self._metric_name}')
 
-        algos = ['astar', 'gbfs', 'gwo', 'hybrid']
+        algos = ['gbfs', 'gwo']
         y_positions = []
         widths = []
         colors = []
@@ -241,9 +239,9 @@ class PerformanceTable(QTableWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        # Thiết lập bảng - 5 cột: Chỉ số + 4 thuật toán
-        self.setColumnCount(5)
-        self.setHorizontalHeaderLabels(['Chỉ số', 'A*', 'GBFS', 'GWO', 'Hybrid'])
+        # Thiết lập bảng
+        self.setColumnCount(3)
+        self.setHorizontalHeaderLabels(['Chỉ số', 'GBFS', 'GWO'])
 
         # Các hàng
         metrics = [
@@ -268,7 +266,7 @@ class PerformanceTable(QTableWidget):
 
     def update_metrics(self, metrics: Dict[str, Dict[str, Any]]):
         """Cập nhật bảng với các chỉ số từ kết quả so sánh."""
-        algo_columns = {'astar': 1, 'gbfs': 2, 'gwo': 3, 'hybrid': 4}
+        algo_columns = {'gbfs': 1, 'gwo': 2}
         metric_rows = {
             'execution_time_seconds': 0,
             'final_cost': 1,
@@ -307,7 +305,7 @@ class PerformanceTable(QTableWidget):
 
     def highlight_winner(self, winner: str):
         """Đánh dấu cột thuật toán chiến thắng."""
-        algo_columns = {'astar': 1, 'gbfs': 2, 'gwo': 3, 'hybrid': 4}
+        algo_columns = {'gbfs': 1, 'gwo': 2}
         winner_col = algo_columns.get(winner)
 
         if winner_col is None:
@@ -346,8 +344,7 @@ class RadarChart(QWidget):
         self._colors = {
             'astar': COLORS.warning,  # Orange for A* (optimal baseline)
             'gbfs': COLORS.success,
-            'gwo': COLORS.purple,
-            'hybrid': COLORS.cyan
+            'gwo': COLORS.purple
         }
 
     def set_data(self, algorithm: str, values: List[float]):

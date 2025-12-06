@@ -14,8 +14,8 @@ from src.models.node import (
     Node, NodeType, PopulationZone, Shelter, HazardZone,
     haversine_distance, lat_lon_to_mercator, mercator_to_lat_lon
 )
-from src.models.edge import Edge, RoadType, ROAD_CAPACITY, DEFAULT_SPEEDS
-from src.models.network import EvacuationNetwork, NetworkStats
+from src.models.edge import Edge, RoadType, ROAD_CAPACITY
+from src.models.network import EvacuationNetwork
 
 
 class TestHaversineDistance:

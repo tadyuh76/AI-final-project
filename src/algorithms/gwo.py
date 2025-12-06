@@ -815,7 +815,7 @@ class GreyWolfOptimizer(BaseAlgorithm):
         start_time = self._start_timer()
 
         # Khởi tạo bài toán
-        self._initialize_problem(use_actual_paths=use_actual_paths)
+        self._initialize_problem()
 
         if self.n_zones == 0 or self.n_shelters == 0:
             self._stop_timer(start_time)

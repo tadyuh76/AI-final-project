@@ -11,7 +11,6 @@ from .base import (
     BaseAlgorithm, EvacuationPlan, EvacuationRoute, AlgorithmMetrics,
     ProgressCallback
 )
-from .astar import AStarSearch
 from .gbfs import GreedyBestFirstSearch
 from .gwo import GreyWolfOptimizer
 from .comparator import AlgorithmComparator, ComparisonResult, run_comparison

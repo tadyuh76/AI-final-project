@@ -13,7 +13,6 @@ from .base import (
     BaseAlgorithm, AlgorithmType, AlgorithmConfig,
     EvacuationPlan, AlgorithmMetrics
 )
-from .astar import AStarSearch
 from .gbfs import GreedyBestFirstSearch
 from .gwo import GreyWolfOptimizer
 from ..models.network import EvacuationNetwork
@@ -153,9 +152,7 @@ class AlgorithmComparator:
 
     def _create_algorithm(self, algo_type: AlgorithmType) -> BaseAlgorithm:
         """Tạo một thể hiện thuật toán của loại được chỉ định."""
-        if algo_type == AlgorithmType.ASTAR:
-            return AStarSearch(self.network, self.config)
-        elif algo_type == AlgorithmType.GBFS:
+        if algo_type == AlgorithmType.GBFS:
             return GreedyBestFirstSearch(self.network, self.config)
         elif algo_type == AlgorithmType.GWO:
             return GreyWolfOptimizer(self.network, self.config)
@@ -344,8 +341,8 @@ class AlgorithmComparator:
             ('Số lần lặp', 'iterations', '{:d}')
         ]
 
-        # Thứ tự thuật toán: A*, GBFS, GWO, Hybrid
-        algo_order = [AlgorithmType.ASTAR, AlgorithmType.GBFS, AlgorithmType.GWO, AlgorithmType.HYBRID]
+        # Thứ tự thuật toán: GBFS, GWO
+        algo_order = [AlgorithmType.GBFS, AlgorithmType.GWO]
 
         for display_name, attr_name, fmt in metrics_display:
             values = []

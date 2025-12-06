@@ -3,7 +3,7 @@ Dữ liệu Thành phố Hồ Chí Minh: Quận, dân số và khu vực ngập 
 Cung cấp dữ liệu thực tế cho mô phỏng sơ tán.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from dataclasses import dataclass
 
 

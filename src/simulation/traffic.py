@@ -11,10 +11,9 @@ Triển khai động lực dòng chảy giao thông bao gồm:
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import math
 
 from ..models.network import EvacuationNetwork
-from ..models.edge import Edge, RoadType
+from ..models.edge import Edge
 
 
 class TrafficState(Enum):

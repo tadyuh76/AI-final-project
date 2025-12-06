@@ -4,13 +4,13 @@ Dashboard hiển thị các chỉ số thời gian thực trong quá trình mô 
 
 from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QFrame, QProgressBar, QSizePolicy, QScrollArea
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QFrame, QProgressBar, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QBrush
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QColor
 
-from .styles import COLORS, Sizes, hex_to_rgb
+from .styles import COLORS, hex_to_rgb
 
 
 def hex_to_qcolor(hex_color: str, alpha: int = 255) -> QColor:

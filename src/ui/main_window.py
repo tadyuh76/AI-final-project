@@ -4,18 +4,18 @@ Tích hợp tất cả các thành phần UI và xử lý logic ứng dụng.
 """
 
 import sys
+import random
 from typing import Optional, Dict, Any
-from threading import Thread
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QSplitter, QStatusBar, QLabel,
-    QMessageBox, QApplication, QFrame
+    QTabWidget, QStatusBar, QLabel,
+    QMessageBox, QApplication
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot
-from PyQt6.QtGui import QFont, QCloseEvent
+from PyQt6.QtCore import pyqtSignal, QThread, pyqtSlot
+from PyQt6.QtGui import QCloseEvent
 
-from .styles import COLORS, MAIN_STYLESHEET, Sizes, hex_to_rgb
+from .styles import MAIN_STYLESHEET, Sizes, hex_to_rgb
 from .map_widget import MapWidget
 from .control_panel import ControlPanel
 from .dashboard import Dashboard
@@ -27,10 +27,9 @@ from ..algorithms.gbfs import GreedyBestFirstSearch
 from ..algorithms.gwo import GreyWolfOptimizer
 from ..algorithms.comparator import AlgorithmComparator, ComparisonResult
 from ..simulation.engine import SimulationEngine, SimulationConfig, SimulationMetrics
-import random
-from ..data.hcm_data import HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS
+from ..data.hcm_data import HCM_BOUNDS
 from ..models.node import HazardZone
-from ..data.osm_loader import OSMDataLoader, load_network
+from ..data.osm_loader import OSMDataLoader
 
 
 def hex_to_qcolor(hex_color: str, alpha: int = 255):

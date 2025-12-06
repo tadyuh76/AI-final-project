@@ -2,11 +2,11 @@
 Panel điều khiển cho cấu hình thuật toán và điều khiển mô phỏng.
 """
 
-from typing import Optional, Dict, Any, Callable, List
+from typing import Optional, Dict, Any, List
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QPushButton, QComboBox, QSlider, QSpinBox, QDoubleSpinBox,
-    QFrame, QSizePolicy, QButtonGroup, QRadioButton, QCheckBox,
+    QPushButton, QComboBox, QSlider, QSpinBox,
+    QFrame, QButtonGroup, QCheckBox,
     QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSignal

@@ -11,12 +11,12 @@ import numpy as np
 # Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from src.models.node import Node, PopulationZone, Shelter, HazardZone
 from src.models.edge import Edge, RoadType
 from src.models.network import EvacuationNetwork
 from src.algorithms.base import (
     AlgorithmType, AlgorithmConfig, EvacuationRoute,
-    EvacuationPlan, AlgorithmMetrics, BaseAlgorithm
+    EvacuationPlan, AlgorithmMetrics
 )
 from src.algorithms.gbfs import GreedyBestFirstSearch, SearchNode
 from src.algorithms.gwo import GreyWolfOptimizer, Wolf

@@ -12,11 +12,9 @@ from typing import Dict, List, Optional, Callable, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import time
-import copy
 
 from ..models.network import EvacuationNetwork
-from ..models.node import PopulationZone, Shelter, HazardZone
-from ..models.edge import Edge
+from ..models.node import Shelter
 from ..algorithms.base import EvacuationPlan, EvacuationRoute
 
 

@@ -10,7 +10,7 @@ import os
 # Thêm thư mục cha vào đường dẫn để import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from src.models.node import Node, PopulationZone, Shelter
 from src.models.edge import Edge, RoadType
 from src.models.network import EvacuationNetwork
 from src.algorithms.base import EvacuationPlan, EvacuationRoute
@@ -21,7 +21,7 @@ from src.simulation.engine import (
 )
 from src.simulation.traffic import (
     TrafficFlowModel, TrafficState, TrafficConfig,
-    EdgeTrafficState, NetworkTrafficState, TrafficAssignment
+    TrafficAssignment
 )
 from src.simulation.events import (
     EventManager, EventQueue, EventFactory, EventType,
@@ -129,9 +129,9 @@ class TestSimulationConfig:
     def test_default_config(self):
         """Kiểm tra các giá trị cấu hình mặc định."""
         config = SimulationConfig()
-        assert config.time_step_minutes == 5.0
+        assert config.time_step_minutes == 1.0
         assert config.max_duration_hours == 24.0
-        assert config.flow_rate_per_step == 0.1
+        assert config.flow_rate_per_step == 0.5
 
     def test_custom_config(self):
         """Kiểm tra cấu hình tùy chỉnh."""

@@ -8,7 +8,7 @@ Xử lý các sự kiện động xảy ra trong quá trình sơ tán:
 - Kích hoạt định tuyến lại
 """
 
-from typing import Dict, List, Optional, Callable, Any, Tuple
+from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime

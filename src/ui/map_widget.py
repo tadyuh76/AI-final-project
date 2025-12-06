@@ -4,28 +4,26 @@ Sử dụng QGraphicsView với tăng tốc OpenGL cho hiệu suất cao.
 """
 
 from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
 import math
 
 from PyQt6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsItem,
     QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsRectItem,
-    QGraphicsTextItem, QGraphicsItemGroup, QWidget, QVBoxLayout,
-    QGraphicsPolygonItem, QHBoxLayout, QPushButton, QLabel, QFrame,
-    QCheckBox
+    QGraphicsTextItem, QWidget, QVBoxLayout,
+    QHBoxLayout, QPushButton, QLabel, QFrame
 )
 from PyQt6.QtCore import (
-    Qt, QPointF, QRectF, QTimer, pyqtSignal, QLineF
+    Qt, QPointF, QTimer, pyqtSignal
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QBrush, QColor, QPainterPath, QFont,
-    QRadialGradient, QLinearGradient, QPolygonF, QTransform, QWheelEvent
+    QRadialGradient, QWheelEvent
 )
 
-from .styles import COLORS, hex_to_rgb, Animation, MapStyle, Sizes
+from .styles import COLORS, hex_to_rgb
 from .control_panel import StyledCheckBox
 from ..models.network import EvacuationNetwork
-from ..models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
+from ..models.node import PopulationZone, Shelter, HazardZone
 from ..models.edge import RoadType
 from ..data.hcm_data import HCM_DISTRICTS, DistrictData
 

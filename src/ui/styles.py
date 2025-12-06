@@ -4,7 +4,7 @@ Thiết kế tối hiện đại lấy cảm hứng từ GitHub Dark.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Tuple
 
 
 @dataclass

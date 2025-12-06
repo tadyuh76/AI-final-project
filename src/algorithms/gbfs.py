@@ -8,10 +8,9 @@ Sử dụng heuristic đa mục tiêu kết hợp:
 - Sức chứa còn lại của nơi trú ẩn
 """
 
-from typing import List, Dict, Optional, Tuple, Set, Any
+from typing import List, Optional, Tuple, Set
 from dataclasses import dataclass
 import heapq
-import time
 
 from .base import (
     BaseAlgorithm, AlgorithmType, AlgorithmConfig,

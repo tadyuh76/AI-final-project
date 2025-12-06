@@ -11,10 +11,9 @@ Hệ thống cấp bậc sói:
 - Omega (ω): Các cá thể còn lại trong quần thể
 """
 
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import numpy as np
-import time
 
 from .base import (
     BaseAlgorithm, AlgorithmType, AlgorithmConfig,

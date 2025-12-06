@@ -4,18 +4,14 @@ Tải xuống và xử lý dữ liệu mạng lưới đường thực tế sử
 Dự phòng dữ liệu được tạo nếu OSMnx không khả dụng.
 """
 
-import os
-import json
-import hashlib
-from typing import Optional, Tuple, List, Dict
+from typing import Optional
 from pathlib import Path
 
 from ..models.network import EvacuationNetwork
 from ..models.node import Node, NodeType, PopulationZone, Shelter, HazardZone
 from ..models.edge import Edge, RoadType
 from .hcm_data import (
-    HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS,
-    DistrictData, ShelterTemplate
+    HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS
 )
 
 # Thử import OSMnx

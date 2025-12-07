@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 
 from .styles import COLORS, Sizes, hex_to_rgb
+from ..data.scenario_config import SCENARIOS, CURRENT_SCENARIO
 
 def hex_to_qcolor(hex_color: str, alpha: int = 255):
     """Chuyển đổi hex sang QColor."""
@@ -245,6 +246,7 @@ class ControlPanel(QWidget):
     stop_clicked = pyqtSignal()
     algorithm_changed = pyqtSignal(str)
     config_changed = pyqtSignal(dict)
+    scenario_changed = pyqtSignal(int)  # Signal khi thay đổi kịch bản
 
     # Hazard zone signals
     hazard_add_mode_changed = pyqtSignal(bool)
@@ -287,6 +289,30 @@ class ControlPanel(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
+        # ===== Chọn kịch bản thử nghiệm =====
+        scenario_group = QGroupBox("Kịch bản thử nghiệm")
+        scenario_layout = QVBoxLayout(scenario_group)
+
+        self.scenario_combo = QComboBox()
+        for scenario_id, scenario_data in SCENARIOS.items():
+            self.scenario_combo.addItem(
+                f"{scenario_id}. {scenario_data['name']}",
+                scenario_id
+            )
+        # Set current scenario
+        self.scenario_combo.setCurrentIndex(CURRENT_SCENARIO - 1)
+        self.scenario_combo.currentIndexChanged.connect(self._on_scenario_changed)
+        scenario_layout.addWidget(self.scenario_combo)
+
+        # Thông tin kịch bản
+        self.scenario_info_label = QLabel()
+        self.scenario_info_label.setWordWrap(True)
+        self.scenario_info_label.setStyleSheet(f"color: {COLORS.text_secondary}; font-size: 11px;")
+        self._update_scenario_info()
+        scenario_layout.addWidget(self.scenario_info_label)
+
+        layout.addWidget(scenario_group)
+
         # ===== Chọn thuật toán =====
         algo_group = QGroupBox("Thuật toán")
         algo_layout = QVBoxLayout(algo_group)
@@ -307,7 +333,7 @@ class ControlPanel(QWidget):
 
         # Population slider - cho phép từ 1% đến 100%
         self.population_slider = LabeledSlider(
-            "Dân số (%)", 1, 100, 50, decimals=0
+            "Dân số (%)", 1, 100, 10, decimals=0
         )
         self.population_slider.value_changed.connect(self._on_config_changed)
         pop_layout.addWidget(self.population_slider)
@@ -597,6 +623,31 @@ class ControlPanel(QWidget):
             "GWO (Tối ưu bầy sói)": "gwo"
         }
         self.algorithm_changed.emit(algo_map.get(text, "gbfs"))
+
+    def _on_scenario_changed(self, index: int):
+        """Xử lý khi kịch bản thay đổi."""
+        scenario_id = self.scenario_combo.itemData(index)
+        if scenario_id:
+            self._update_scenario_info()
+            self.scenario_changed.emit(scenario_id)
+
+    def _update_scenario_info(self):
+        """Cập nhật thông tin kịch bản hiển thị."""
+        from ..data.scenario_config import SCENARIOS, HAZARD_CONFIGS
+        index = self.scenario_combo.currentIndex()
+        scenario_id = self.scenario_combo.itemData(index)
+        if scenario_id and scenario_id in SCENARIOS:
+            scenario = SCENARIOS[scenario_id]
+            hazard_scale = scenario['hazard_scale']
+            num_hazards = len(HAZARD_CONFIGS[hazard_scale])
+            pop_ratio = scenario['population_ratio']
+            self.scenario_info_label.setText(
+                f"Vùng nguy hiểm: {num_hazards} | Dân số: {pop_ratio*100:.0f}%"
+            )
+
+    def get_selected_scenario(self) -> int:
+        """Lấy ID kịch bản đang chọn."""
+        return self.scenario_combo.itemData(self.scenario_combo.currentIndex()) or 1
 
     def _on_pause_clicked(self):
         """Xử lý nút pause/resume."""

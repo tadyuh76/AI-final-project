@@ -13,6 +13,10 @@ from ..models.edge import Edge, RoadType
 from .hcm_data import (
     HCM_DISTRICTS, HCM_SHELTERS, FLOOD_PRONE_AREAS, HCM_BOUNDS
 )
+from .scenario_config import (
+    CURRENT_SCENARIO, get_current_hazards, get_population_ratio,
+    get_current_scenario, print_current_scenario
+)
 
 # Thử import OSMnx
 try:
@@ -341,13 +345,19 @@ class OSMDataLoader:
     def add_default_hazards(self, network: EvacuationNetwork,
                            typhoon_intensity: float = 0.7) -> None:
         """
-        Thêm các khu vực nguy hiểm ngập lụt mặc định dựa trên dữ liệu lịch sử.
+        Thêm các khu vực nguy hiểm ngập lụt theo kịch bản đã cấu hình.
 
         Args:
             network: Mạng lưới để thêm nguy hiểm vào
             typhoon_intensity: Hệ số nhân cho mức độ rủi ro (0.0 đến 1.0)
         """
-        for area in FLOOD_PRONE_AREAS:
+        # In thông tin kịch bản hiện tại
+        print_current_scenario()
+
+        # Lấy hazards theo kịch bản
+        hazard_areas = get_current_hazards()
+
+        for area in hazard_areas:
             hazard = HazardZone(
                 center_lat=area['center_lat'],
                 center_lon=area['center_lon'],
@@ -357,7 +367,16 @@ class OSMDataLoader:
             )
             network.add_hazard_zone(hazard)
 
-        print(f"  Đã thêm {len(FLOOD_PRONE_AREAS)} khu vực nguy hiểm")
+        print(f"  Đã thêm {len(hazard_areas)} khu vực nguy hiểm (Kịch bản {CURRENT_SCENARIO})")
+
+        # Điều chỉnh dân số theo tỷ lệ kịch bản
+        population_ratio = get_population_ratio()
+        zones = network.get_population_zones()
+        for zone in zones:
+            zone.population = int(zone.population * population_ratio)
+
+        total_pop = sum(z.population for z in zones)
+        print(f"  Dân số đã điều chỉnh: {total_pop:,} người ({population_ratio*100:.0f}%)")
 
 
 def load_network(use_cache: bool = True,

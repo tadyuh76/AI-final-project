@@ -216,6 +216,7 @@ class SimulationEngine:
 
         # Khởi tạo trạng thái tuyến đường
         self._route_states.clear()
+        self._max_route_time = 0.0  # Thời gian di chuyển tối đa của kế hoạch
         for i, route in enumerate(plan.routes):
             route_id = f"route_{i}_{route.zone_id}_{route.shelter_id}"
             self._route_states[route_id] = RouteState(
@@ -223,6 +224,7 @@ class SimulationEngine:
                 total_assigned=route.flow,
                 estimated_arrival=route.estimated_time_hours
             )
+            self._max_route_time = max(self._max_route_time, route.estimated_time_hours)
 
         # Tính tổng sức chứa nơi trú ẩn
         shelters = list(self.network.get_shelters())
@@ -303,8 +305,17 @@ class SimulationEngine:
         if self._state == SimulationState.IDLE:
             return self._metrics
 
+        # Kiểm tra hoàn thành TRƯỚC KHI thực hiện bước mới
+        if self._is_evacuation_complete():
+            self._state = SimulationState.COMPLETED
+            return self._metrics
+
         time_step_hours = self.config.time_step_minutes / 60.0
         self._step(time_step_hours)
+
+        # Kiểm tra hoàn thành SAU KHI thực hiện bước
+        if self._is_evacuation_complete():
+            self._state = SimulationState.COMPLETED
 
         return self._metrics
 
@@ -537,44 +548,39 @@ class SimulationEngine:
             self._metrics.evacuation_progress = total_evacuated / self._initial_population
 
         # Ước tính thời gian hoàn thành
-        # Tính dựa trên người đã khởi hành (không chỉ đã đến) để có ước tính chính xác hơn
-        total_departed = sum(state.departed for state in self._route_states.values())
+        # Tính số người còn cần đến nơi
+        total_remaining_to_arrive = 0
+        for state in self._route_states.values():
+            if not state.blocked:
+                total_remaining_to_arrive += state.total_assigned - state.arrived
 
-        if total_departed > 0 and self._current_time > 0:
-            # Tính tốc độ khởi hành (người/giờ)
-            departure_rate = total_departed / self._current_time
+        # Sử dụng thời gian di chuyển tối đa đã tính từ kế hoạch
+        max_travel_time = getattr(self, '_max_route_time', 1.0)
 
-            # Tính thời gian di chuyển trung bình của các tuyến đang hoạt động
-            avg_travel_time = 0.0
-            active_count = 0
-            for state in self._route_states.values():
-                if not state.is_complete and not state.blocked:
-                    avg_travel_time += state.route.estimated_time_hours
-                    active_count += 1
-            if active_count > 0:
-                avg_travel_time /= active_count
+        # Nếu không còn ai cần đến, estimated time = current time (hoàn thành!)
+        if total_remaining_to_arrive == 0:
+            self._metrics.estimated_completion_hours = self._current_time
+        else:
+            # Tính thời gian còn lại dựa trên tốc độ sơ tán hiện tại
+            if total_evacuated > 0 and self._current_time > 0:
+                # Tốc độ đến nơi (người/giờ)
+                arrival_rate = total_evacuated / self._current_time
+
+                if arrival_rate > 0:
+                    time_remaining = total_remaining_to_arrive / arrival_rate
+                    # Giới hạn thời gian còn lại: không quá 2x max_travel_time của kế hoạch
+                    # và không âm
+                    time_remaining = max(0, min(time_remaining, max_travel_time * 2))
+                    self._metrics.estimated_completion_hours = self._current_time + time_remaining
+                else:
+                    # Không có ai đến -> ước tính = current + max_travel
+                    self._metrics.estimated_completion_hours = self._current_time + max_travel_time
+            elif self._current_time == 0:
+                # Ước tính ban đầu: max_travel_time x 1.5 (buffer cho tắc nghẽn)
+                self._metrics.estimated_completion_hours = max_travel_time * 1.5 if max_travel_time > 0 else 1.0
             else:
-                avg_travel_time = self._metrics.average_travel_time if self._metrics.average_travel_time > 0 else 0.5
-
-            # Số người còn lại cần khởi hành
-            remaining_to_depart = self._initial_population - total_departed
-
-            if departure_rate > 0:
-                # Thời gian để tất cả khởi hành + thời gian di chuyển trung bình
-                time_to_complete_departures = remaining_to_depart / departure_rate
-                self._metrics.estimated_completion_hours = \
-                    self._current_time + time_to_complete_departures + avg_travel_time
-            else:
-                self._metrics.estimated_completion_hours = self._current_time + avg_travel_time
-        elif self._current_time == 0:
-            # Ước tính ban đầu dựa trên thời gian di chuyển trung bình của kế hoạch
-            avg_time = 0.0
-            count = 0
-            for state in self._route_states.values():
-                avg_time += state.route.estimated_time_hours
-                count += 1
-            if count > 0:
-                self._metrics.estimated_completion_hours = (avg_time / count) * 2  # x2 for buffer
+                # Fallback: current + max_travel
+                self._metrics.estimated_completion_hours = self._current_time + max_travel_time
 
         # Ghi điểm lịch sử
         self._metrics.evacuation_history.append(
@@ -583,10 +589,20 @@ class SimulationEngine:
 
     def _is_evacuation_complete(self) -> bool:
         """Kiểm tra xem việc sơ tán đã hoàn thành chưa."""
-        # Tất cả các tuyến đường đã hoàn thành hoặc bị chặn
+        # Không có route nào -> hoàn thành (không có gì để làm)
+        if not self._route_states:
+            return True
+
+        # Kiểm tra tất cả các tuyến đường đã hoàn thành hoặc bị chặn
         for state in self._route_states.values():
             if not state.is_complete and not state.blocked:
                 return False
+
+        # Double check: không còn ai đang di chuyển
+        total_in_transit = sum(state.in_transit for state in self._route_states.values())
+        if total_in_transit > 0:
+            return False
+
         return True
 
     def pause(self) -> None:

@@ -303,6 +303,9 @@ class MainWindow(QMainWindow):
         self.control_panel.hazard_zones_clear_requested.connect(self._on_hazard_zones_clear)
         self.control_panel.hazard_zones_randomize_requested.connect(self._on_hazard_zones_randomize)
 
+        # Scenario change signal
+        self.control_panel.scenario_changed.connect(self._on_scenario_changed)
+
         # Map click signal for hazard placement
         self.map_widget.canvas.map_clicked_for_hazard.connect(self._on_map_clicked_for_hazard)
 
@@ -460,6 +463,56 @@ class MainWindow(QMainWindow):
         }
         self.algo_label.setText(algo_names.get(algorithm, algorithm))
         self.status_label.setText(f"Đã chọn thuật toán: {algo_names.get(algorithm, algorithm)}")
+
+    @pyqtSlot(int)
+    def _on_scenario_changed(self, scenario_id: int):
+        """Xử lý khi kịch bản thay đổi."""
+        import src.data.scenario_config as scenario_config
+        from ..data.scenario_config import SCENARIOS, HAZARD_CONFIGS
+
+        # Cập nhật CURRENT_SCENARIO trong module
+        scenario_config.CURRENT_SCENARIO = scenario_id
+
+        scenario = SCENARIOS.get(scenario_id)
+        if not scenario:
+            return
+
+        self.status_label.setText(f"Đang tải kịch bản {scenario_id}...")
+        QApplication.processEvents()
+
+        # Xóa hazard zones cũ
+        self._network.clear_hazard_zones()
+
+        # Thêm hazard zones mới theo kịch bản
+        hazard_areas = HAZARD_CONFIGS[scenario['hazard_scale']]
+        for area in hazard_areas:
+            hazard = HazardZone(
+                center_lat=area['center_lat'],
+                center_lon=area['center_lon'],
+                radius_km=area['radius_km'],
+                risk_level=area['risk'] * 0.7,  # typhoon_intensity
+                hazard_type='flood'
+            )
+            self._network.add_hazard_zone(hazard)
+
+        # Điều chỉnh dân số theo tỷ lệ
+        population_ratio = scenario['population_ratio']
+        for zone in self._network.get_population_zones():
+            zone.population = int(zone.base_population * population_ratio)
+
+        # Cập nhật UI
+        self.map_widget.set_network(self._network)
+        self.control_panel.update_hazard_zone_list(self._network.get_hazard_zones())
+
+        # Cập nhật slider dân số
+        self.control_panel.population_slider.setValue(population_ratio * 100, block_signal=True)
+
+        stats = self._network.get_stats()
+        self.status_label.setText(
+            f"Kịch bản {scenario_id}: {scenario['name']} | "
+            f"Dân số: {stats.total_population:,} | "
+            f"Vùng nguy hiểm: {len(hazard_areas)}"
+        )
 
     @pyqtSlot(dict)
     def _on_config_changed(self, config: Dict[str, Any]):
@@ -751,9 +804,19 @@ class MainWindow(QMainWindow):
     def _on_simulation_completed(self, metrics: SimulationMetrics):
         """Xử lý khi mô phỏng hoàn thành."""
         self.map_widget.stop_animation()
+        self.map_widget.clear_particles()  # Xóa tất cả hạt di chuyển
         self.control_panel.set_completed_state()
         self.status_label.setText(
             f"Mô phỏng hoàn thành! Đã sơ tán: {metrics.total_evacuated:,} người"
+        )
+
+        # Hiển thị hộp thoại thông báo hoàn thành
+        QMessageBox.information(
+            self,
+            "Hoàn thành",
+            f"Mô phỏng đã hoàn thành thành công!\n\n"
+            f"Tổng số người đã sơ tán: {metrics.total_evacuated:,}\n"
+            f"Tỷ lệ bao phủ: {metrics.coverage_rate:.1%}"
         )
 
     @pyqtSlot(str)

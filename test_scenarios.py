@@ -327,7 +327,7 @@ def run_scenario(scenario: Dict) -> ScenarioResult:
 
     gwo = GreyWolfOptimizer(network, config)
     gwo_start = time.time()
-    gwo_plan, gwo_metrics = gwo.optimize()
+    gwo_plan, gwo_metrics = gwo.optimize(use_actual_paths=True)
     gwo_time = time.time() - gwo_start
 
     gwo_plan_metrics = calculate_plan_metrics(gwo_plan)

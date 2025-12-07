@@ -109,7 +109,7 @@ class AlgorithmComparator:
 
     def compare(self, algorithms: List[AlgorithmType]) -> ComparisonResult:
         """
-        So sánh các thuật toán được chỉ định.
+        So sánh các thuật toán được chỉ định - CHẠY TUẦN TỰ.
 
         Args:
             algorithms: Danh sách các loại thuật toán để so sánh
@@ -133,7 +133,7 @@ class AlgorithmComparator:
                     return cb
                 algorithm.set_progress_callback(make_callback(algo_type))
 
-            # GWO cần use_actual_paths=True để tính khoảng cách thực qua mạng lưới
+            # Chạy tối ưu hóa
             if algo_type == AlgorithmType.GWO:
                 plan, metrics = algorithm.optimize(use_actual_paths=True)
             else:

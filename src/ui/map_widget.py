@@ -1044,6 +1044,13 @@ class MapCanvas(QGraphicsView):
         self._animation_timer.stop()
         self._animation_running = False
 
+    def clear_particles(self):
+        """Xóa tất cả các hạt di chuyển (khi mô phỏng hoàn thành)."""
+        for particle in self._particles:
+            self._return_particle_to_pool(particle)
+        self._particles.clear()
+        self._active_groups.clear()
+
     def _animation_tick(self):
         """Cập nhật hoạt hình mỗi frame - được tối ưu."""
         # Pulse hazard zones (đã được tối ưu trong HazardZoneItem)

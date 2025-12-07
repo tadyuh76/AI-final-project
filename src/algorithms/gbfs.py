@@ -51,9 +51,6 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         super().__init__(network)
         self.config = config or AlgorithmConfig()
 
-        # Path cache: (zone_id, shelter_id) -> (path, distance, time, risk)
-        self._path_cache: Dict[Tuple[str, str], Tuple[List[str], float, float, float]] = {}
-
         # Trọng số cho các thành phần heuristic
         self.w_dist = self.config.distance_weight
         self.w_risk = self.config.risk_weight
@@ -93,16 +90,16 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         # 3. Tắc nghẽn cục bộ (0-1) - đã tính trước
         h_congestion = node_congestion
 
-        # 4. Penalty cho shelter gần đầy (0-10)
+        # 4. Phạt cho shelter gần đầy (0-10)
         if goal.capacity > 0:
-            h_capacity = goal.occupancy_rate * 5.0  # 0-5 based on fullness
+            h_capacity = goal.occupancy_rate * 5.0  # 0-5 dựa trên mức độ đầy
         else:
-            h_capacity = 10.0  # No capacity = high penalty
+            h_capacity = 10.0  # Không có sức chứa = phạt cao
 
         # Kết hợp với trọng số
         # Risk penalty được tăng mạnh để tránh đi qua vùng nguy hiểm
         # risk = 0.5 -> penalty ~25, risk = 0.8 -> penalty ~64
-        risk_penalty = h_risk * h_risk * 100.0  # Exponential penalty for risk
+        risk_penalty = h_risk * h_risk * 100.0  # Phạt theo hàm mũ cho rủi ro
 
         h = (self.w_dist * h_dist +
              self.w_risk * risk_penalty +
@@ -117,125 +114,6 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         if not edges:
             return 0.0
         return sum(e.congestion_level for e in edges) / len(edges)
-
-    def _precompute_paths(self, zones: List[PopulationZone], shelters: List[Shelter]) -> None:
-        """
-        Tính trước tất cả đường đi từ zones đến shelters sử dụng A*.
-        Kết quả được cache để sử dụng sau.
-        """
-        self._path_cache.clear()
-
-        for zone in zones:
-            for shelter in shelters:
-                # Kiểm tra shelter có ở vùng rủi ro cao không
-                shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
-                if shelter_risk > 0.6:
-                    continue  # Bỏ qua shelter không an toàn
-
-                # Tìm đường đi bằng GBFS thuần túy
-                path, distance, time_h, risk = self._find_path_gbfs(zone, shelter)
-
-                if path:
-                    self._path_cache[(zone.id, shelter.id)] = (path, distance, time_h, risk)
-
-    def _find_path_gbfs(self, zone: PopulationZone, shelter: Shelter) -> Tuple[List[str], float, float, float]:
-        """
-        Tìm đường đi từ zone đến shelter sử dụng GBFS thuần túy (chỉ h-cost).
-
-        Returns:
-            Tuple của (path, distance_km, time_hours, max_risk)
-        """
-        # Lấy node zone và shelter từ mạng
-        zone_node = self.network.get_node(zone.id)
-        if not zone_node:
-            zone_node = self.network.find_nearest_node(zone.lat, zone.lon)
-
-        shelter_node = self.network.get_node(shelter.id)
-        shelter_nearest = self.network.find_nearest_node(shelter.lat, shelter.lon)
-
-        if not zone_node:
-            return [], 0, 0, 1.0
-
-        target_node = shelter_node if shelter_node else shelter_nearest
-        if not target_node:
-            return [], 0, 0, 1.0
-
-        # GBFS search - chỉ dùng heuristic h(n), không dùng g(n)
-        counter = 0
-        start_h = haversine_distance(zone_node.lat, zone_node.lon, target_node.lat, target_node.lon)
-
-        # open_set: (h_cost, counter, node_id, path, total_dist, total_time, max_risk)
-        # GBFS: priority = h(n) only (pure heuristic)
-        if self.network.get_node(zone.id):
-            open_set = [(start_h, counter, zone_node.id, [zone_node.id], 0.0, 0.0, 0.0)]
-        else:
-            open_set = [(start_h, counter, zone_node.id, [zone.id, zone_node.id], 0.0, 0.0, 0.0)]
-
-        visited = set()
-
-        while open_set:
-            _, _, current_id, path, total_dist, total_time, max_risk = heapq.heappop(open_set)
-
-            if current_id in visited:
-                continue
-            visited.add(current_id)
-
-            # Cập nhật max_risk
-            current_node = self.network.get_node(current_id)
-            if current_node:
-                node_risk = self.network.get_total_risk_at(current_node.lat, current_node.lon)
-                max_risk = max(max_risk, node_risk)
-
-            # Kiểm tra đã đến shelter
-            if current_id == shelter.id:
-                return path, total_dist, total_time, max_risk
-
-            # Kiểm tra đã đến node gần shelter
-            if shelter_nearest and current_id == shelter_nearest.id:
-                edge_to_shelter = self.network.get_edge_between(current_id, shelter.id)
-                if edge_to_shelter and not edge_to_shelter.is_blocked:
-                    final_path = path + [shelter.id]
-                    final_dist = total_dist + edge_to_shelter.length_km
-                    final_time = total_time + edge_to_shelter.current_travel_time
-                    shelter_risk = self.network.get_total_risk_at(shelter.lat, shelter.lon)
-                    final_risk = max(max_risk, edge_to_shelter.flood_risk, shelter_risk)
-                    return final_path, final_dist, final_time, final_risk
-
-            # Mở rộng neighbors
-            for neighbor_id in self.network.get_neighbors(current_id):
-                if neighbor_id in visited:
-                    continue
-
-                edge = self.network.get_edge_between(current_id, neighbor_id)
-                if not edge or edge.is_blocked:
-                    continue
-
-                # Skip high-risk edges
-                if edge.flood_risk > 0.6:
-                    continue
-
-                neighbor_node = self.network.get_node(neighbor_id)
-                if neighbor_node:
-                    # GBFS: priority = h(n) only - distance to goal + risk penalty
-                    h_dist = haversine_distance(neighbor_node.lat, neighbor_node.lon,
-                                               target_node.lat, target_node.lon)
-                    # Add risk penalty to heuristic (GBFS multi-objective)
-                    h_risk = edge.flood_risk * self.w_risk
-                    h = h_dist + h_risk
-
-                    counter += 1
-
-                    new_dist = total_dist + edge.length_km
-                    new_time = total_time + edge.current_travel_time
-                    new_risk = max(max_risk, edge.flood_risk)
-
-                    heapq.heappush(open_set, (
-                        h, counter, neighbor_id, path + [neighbor_id],
-                        new_dist, new_time, new_risk
-                    ))
-
-        # Không tìm thấy đường
-        return [], 0, 0, 1.0
 
     def find_path(self, source: PopulationZone,
                   shelters: List[Shelter],
@@ -260,16 +138,16 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         for s in shelters:
             if not s.has_capacity():
                 continue
-            # Check if shelter is in high-risk hazard zone
+            # Kiểm tra shelter có nằm trong vùng nguy hiểm cao không
             shelter_risk = self.network.get_total_risk_at(s.lat, s.lon)
-            # In emergency mode, allow shelters in moderate risk areas
+            # Trong chế độ khẩn cấp, cho phép shelter ở vùng rủi ro vừa phải
             risk_threshold = 0.8 if allow_emergency else 0.6
             if shelter_risk > risk_threshold:
                 continue
             available_shelters.append(s)
 
         if not available_shelters:
-            # If no safe shelters, use any available shelters as fallback
+            # Nếu không có shelter an toàn, sử dụng bất kỳ shelter còn sức chứa làm dự phòng
             available_shelters = [s for s in shelters if s.has_capacity()]
 
         if not available_shelters:
@@ -285,23 +163,19 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         if not source_node:
             return None, None, float('inf')
 
-        # GBFS thuần túy: chọn MỘT shelter tốt nhất dựa trên heuristic từ source
-        # Sắp xếp shelters theo heuristic và thử từng cái cho đến khi tìm được đường
+        # THAM LAM: Chọn MỘT shelter tốt nhất theo heuristic (không xếp hạng, không thử nhiều)
         source_risk = self.network.get_total_risk_at(source_node.lat, source_node.lon)
         source_congestion = self._get_local_congestion(source_node.id)
 
-        # Xếp hạng shelters theo heuristic
-        shelter_rankings = []
-        for s in available_shelters:
-            h = self.heuristic(source_node, s, source_risk, source_congestion)
-            shelter_rankings.append((h, s))
-        shelter_rankings.sort(key=lambda x: x[0])
+        best_shelter = min(
+            available_shelters,
+            key=lambda s: self.heuristic(source_node, s, source_risk, source_congestion)
+        )
 
-        # Thử từng shelter theo thứ tự ưu tiên (tối đa 5)
-        for _, target_shelter in shelter_rankings[:5]:
-            path, cost = self._search_to_shelter(source_node, target_shelter, allow_emergency)
-            if path:
-                return path, target_shelter, cost
+        # Tìm đường đến MỘT shelter duy nhất đó
+        path, cost = self._search_to_shelter(source_node, best_shelter, allow_emergency)
+        if path:
+            return path, best_shelter, cost
 
         return None, None, float('inf')
 
@@ -368,8 +242,8 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 if not edge or edge.is_blocked:
                     continue
 
-                # Skip high-risk edges (> 0.5) unless in emergency mode
-                # This prevents paths from going through hazard zones
+                # Bỏ qua cạnh có rủi ro cao (> 0.5) trừ khi ở chế độ khẩn cấp
+                # Điều này ngăn đường đi qua vùng nguy hiểm
                 if not allow_emergency and edge.flood_risk > 0.5:
                     continue
 
@@ -419,8 +293,8 @@ class GreedyBestFirstSearch(BaseAlgorithm):
         paths_found = 0
         total_path_length = 0
 
-        # Filter zones: only evacuate zones that are in hazard areas
-        # Zones far from hazards (low risk) don't need evacuation
+        # Lọc zones: chỉ sơ tán zones nằm trong vùng nguy hiểm
+        # Zones xa vùng nguy hiểm (rủi ro thấp) không cần sơ tán
         zones_to_evacuate = []
         zones_skipped = []
         for z in zones:
@@ -430,18 +304,18 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             else:
                 zones_skipped.append(z)
 
-        # Sort by risk (highest first) then by population
-        # Zones in the CENTER of hazard areas (highest risk) get PRIORITY
+        # Sắp xếp theo rủi ro (cao nhất trước) rồi theo dân số
+        # Zones ở TRUNG TÂM vùng nguy hiểm (rủi ro cao nhất) được ƯU TIÊN
         zones_to_evacuate.sort(key=lambda x: (-x[1], -x[0].population))
         zones = [z for z, _ in zones_to_evacuate]
 
-        # ============ GREEDY PRIORITY ALLOCATION ============
-        # Ưu tiên sơ tán zones có rủi ro CAO NHẤT trước (greedy by risk)
+        # ============ PHÂN BỔ ƯU TIÊN THAM LAM ============
+        # Ưu tiên sơ tán zones có rủi ro CAO NHẤT trước (tham lam theo rủi ro)
         # Zones ở trung tâm vùng nguy hiểm được ưu tiên tối đa
         total_capacity = sum(s.capacity for s in shelters)
         remaining_capacity = total_capacity
 
-        # Phân bổ theo thứ tự ưu tiên rủi ro (greedy)
+        # Phân bổ theo thứ tự ưu tiên rủi ro (tham lam)
         zone_allocation = {}
         for z in zones:
             # Zone có rủi ro cao nhất được phân bổ TOÀN BỘ dân số (nếu còn capacity)
@@ -459,24 +333,19 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             if z.id not in zone_allocation:
                 zone_allocation[z.id] = 0
 
-        # Track remaining allocation per zone
+        # Theo dõi phân bổ còn lại cho mỗi zone
         zone_remaining = {z.id: zone_allocation[z.id] for z in zones}
-
-        # ============ PRE-COMPUTE PATHS ============
-        # Sử dụng A* để tính trước tất cả đường đi và cache kết quả
-        # Điều này giúp tăng tốc đáng kể vì không cần tìm đường nhiều lần
-        self._precompute_paths(zones, shelters)
 
         for i, zone in enumerate(zones):
             if self._should_stop:
                 break
 
-            # Continue assigning until zone reaches its allocated quota or no more shelter capacity
+            # Tiếp tục phân bổ cho đến khi zone đạt được quota phân bổ hoặc không còn sức chứa của shelter
             while zone_remaining[zone.id] >= self.config.min_flow_threshold:
-                # Tìm đường đi cho khu vực này (normal mode first)
+                # Tìm đường đi cho khu vực này (chế độ bình thường trước)
                 path, shelter, cost = self.find_path(zone, shelters, allow_emergency=False)
 
-                # If no path found, retry with emergency mode (allows traversing high-risk areas)
+                # Nếu không tìm thấy đường đi, thử lại với chế độ khẩn cấp (cho phép đi qua vùng nguy hiểm cao)
                 if not path or not shelter:
                     path, shelter, cost = self.find_path(zone, shelters, allow_emergency=True)
 
@@ -488,7 +357,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
                 route_time = self._calculate_path_time(path)
                 route_risk = self._calculate_path_risk(path)
 
-                # Use remaining allocation, capped by shelter capacity
+                # Sử dụng phân bổ còn lại, giới hạn bởi sức chứa của shelter
                 actual_flow = min(zone_remaining[zone.id], shelter.available_capacity)
 
                 if actual_flow < self.config.min_flow_threshold:
@@ -525,7 +394,7 @@ class GreedyBestFirstSearch(BaseAlgorithm):
 
         # Hoàn thiện các chỉ số
         self._stop_timer(start_time)
-        self._metrics.iterations = len(zones)  # Only count zones that needed evacuation
+        self._metrics.iterations = len(zones)  # Chỉ đếm zones cần sơ tán
         self._metrics.final_cost = total_cost
         self._metrics.routes_found = paths_found
         self._metrics.evacuees_covered = plan.total_evacuees
@@ -533,14 +402,27 @@ class GreedyBestFirstSearch(BaseAlgorithm):
             total_path_length / paths_found if paths_found > 0 else 0
         )
 
-        # Tỷ lệ bao phủ: số người được sơ tán / min(dân số cần sơ tán, tổng sức chứa)
-        # Only count population from zones that needed evacuation (in hazard areas)
-        population_needing_evacuation = sum(z.population for z in zones)
+        # Tỷ lệ bao phủ: số người được sơ tán / min(dân số CÓ THỂ sơ tán, tổng sức chứa)
+        # Chỉ tính zones có ít nhất 1 route được tạo (có valid path)
+        zones_with_routes = set(r.zone_id for r in plan.routes)
+        population_with_valid_paths = sum(
+            z.population for z in zones if z.id in zones_with_routes
+        )
+
+        # Nếu không có route nào, dùng tổng dân số cần sơ tán
+        if population_with_valid_paths == 0:
+            population_with_valid_paths = sum(z.population for z in zones)
+
         total_capacity = sum(s.capacity for s in shelters)
-        max_possible = min(population_needing_evacuation, total_capacity)
+        max_possible = min(population_with_valid_paths, total_capacity)
         self._metrics.coverage_rate = (
             plan.total_evacuees / max_possible if max_possible > 0 else 0
         )
+
+        # Log cảnh báo nếu có zones không có valid path
+        zones_without_paths = [z.id for z in zones if z.id not in zones_with_routes]
+        if zones_without_paths:
+            print(f"[GBFS] CẢNH BÁO: {len(zones_without_paths)} zones không có đường đi hợp lệ: {zones_without_paths[:5]}{'...' if len(zones_without_paths) > 5 else ''}")
 
         return plan, self._metrics
 

@@ -456,7 +456,7 @@ class WinnerBadge(QFrame):
                                   Sizes.PADDING_MD, Sizes.PADDING_SM)
 
         # Icon vương miện
-        self.icon_label = QLabel("👑")
+        self.icon_label = QLabel("")
         self.icon_label.setFont(QFont("Segoe UI Emoji", 24))
         layout.addWidget(self.icon_label)
 
